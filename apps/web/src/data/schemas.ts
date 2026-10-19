@@ -119,9 +119,20 @@ export const cardEventSchema = z.object({
 })
 export type CardEvent = z.infer<typeof cardEventSchema>
 
+export const todoSectionSchema = z.object({
+  id,
+  owner_id: id,
+  name: z.string().trim().min(1).max(60),
+  position: z.number(),
+  created_at: timestamp,
+})
+export type TodoSection = z.infer<typeof todoSectionSchema>
+
 export const todoSchema = z.object({
   id,
   owner_id: id,
+  // Null is the inbox.
+  section_id: id.nullable(),
   text: z.string().trim().min(1).max(300),
   done: z.boolean(),
   due_on: day.nullable(),
@@ -129,3 +140,18 @@ export const todoSchema = z.object({
   created_at: timestamp,
 })
 export type Todo = z.infer<typeof todoSchema>
+
+export const canvasKinds = ['whiteboard', 'diagram'] as const
+export type CanvasKind = (typeof canvasKinds)[number]
+
+// The list entry only: the drawing (`data`) is loaded by the editor.
+export const canvasSchema = z.object({
+  id,
+  owner_id: id,
+  name: z.string().trim().min(1).max(80),
+  kind: z.enum(canvasKinds),
+  position: z.number(),
+  created_at: timestamp,
+  updated_at: timestamp,
+})
+export type Canvas = z.infer<typeof canvasSchema>

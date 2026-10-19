@@ -38,6 +38,7 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
@@ -82,7 +83,7 @@ export function ColumnMenu({
         >
           <EllipsisIcon />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuGroup>
             <DropdownMenuItem onClick={() => setEditing(true)}>
               <PencilIcon />
@@ -196,8 +197,8 @@ function EditColumnDialog({
             </form.Field>
             <form.Field name="color">
               {(field) => (
-                <Field>
-                  <FieldLabel>Color</FieldLabel>
+                <Field aria-labelledby="column-color">
+                  <FieldTitle id="column-color">Color</FieldTitle>
                   <ColorPicker value={field.state.value} onChange={field.handleChange} />
                 </Field>
               )}
@@ -287,9 +288,9 @@ function DeleteColumnDialog({
         </AlertDialogHeader>
         {cards.length > 0 ? (
           <Field>
-            <FieldLabel>Move cards to</FieldLabel>
+            <FieldLabel id="column-move-to">Move cards to</FieldLabel>
             <Select value={moveTo?.id ?? null} onValueChange={(v) => setMoveToId(v)}>
-              <SelectTrigger>
+              <SelectTrigger aria-labelledby="column-move-to">
                 <SelectValue>{(id: string) => others.find((c) => c.id === id)?.name}</SelectValue>
               </SelectTrigger>
               <SelectContent>

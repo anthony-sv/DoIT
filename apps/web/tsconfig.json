@@ -15,7 +15,10 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@excalidraw/math": ["./node_modules/@excalidraw/excalidraw/dist/types/math/index.d.ts"],
+      "@excalidraw/utils": ["./node_modules/@excalidraw/excalidraw/dist/types/utils/index.d.ts"],
+      "@excalidraw/utils/*": ["./node_modules/@excalidraw/excalidraw/dist/types/utils/*"]
     }
   }
 }

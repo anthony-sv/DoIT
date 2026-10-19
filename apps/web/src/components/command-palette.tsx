@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { eq, isNull, useLiveQuery } from '@tanstack/react-db'
 import { CircleCheckIcon, KanbanIcon } from 'lucide-react'
+import { kindIcons, kindLabels } from '@/components/canvas/canvas-ui'
 import {
   Command,
   CommandDialog,
@@ -12,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { boardsCollection, cardsCollection } from '@/data/collections'
+import { boardsCollection, canvasesCollection, cardsCollection } from '@/data/collections'
 import { cardKey } from '@/lib/format'
 import { colorClasses } from '@/lib/colors'
 import { cn } from '@/lib/utils'
@@ -23,11 +24,24 @@ export function openCommandPalette() {
   window.dispatchEvent(new Event(OPEN_EVENT))
 }
 
+// Excalidraw binds Mod+K to "add link" and gets the key first (React's
+// listener on the document predates this hotkey's), so while focus is in a
+// whiteboard the palette leaves the key to it. Search in the sidebar still opens it.
+function inWhiteboard(event: KeyboardEvent) {
+  return event.target instanceof Element && event.target.closest('.excalidraw') !== null
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
 
-  useHotkey('Mod+K', () => setOpen((o) => !o), { ignoreInputs: false })
+  useHotkey(
+    'Mod+K',
+    (event) => {
+      if (!inWhiteboard(event)) setOpen((o) => !o)
+    },
+    { ignoreInputs: false },
+  )
   useEffect(() => {
     const show = () => setOpen(true)
     window.addEventListener(OPEN_EVENT, show)
@@ -41,11 +55,16 @@ export function CommandPalette() {
         .where(({ board }) => isNull(board.archived_at))
         .orderBy(({ board }) => board.position),
   })
+  const { data: canvases } = useLiveQuery({
+    query: (q) => q.from({ canvas: canvasesCollection }).orderBy(({ canvas }) => canvas.position),
+  })
   const { data: cards } = useLiveQuery({
     query: (q) =>
       q
         .from({ card: cardsCollection })
         .innerJoin({ board: boardsCollection }, ({ card, board }) => eq(card.board_id, board.id))
+        // Archived boards stay out of search, their cards too.
+        .where(({ board }) => isNull(board.archived_at))
         .orderBy(({ card }) => card.updated_at, 'desc')
         .select(({ card, board }) => ({
           id: card.id,
@@ -65,7 +84,7 @@ export function CommandPalette() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen} title="Search DoIT">
       <Command>
-        <CommandInput placeholder="Find a board or card…" />
+        <CommandInput placeholder="Find a board, drawing or card…" />
         <CommandList>
           <CommandEmpty>Nothing matches.</CommandEmpty>
           <CommandGroup heading="Boards">
@@ -82,6 +101,26 @@ export function CommandPalette() {
                 <KanbanIcon className="ml-auto text-muted-foreground" />
               </CommandItem>
             ))}
+          </CommandGroup>
+          <CommandGroup heading="Drawings">
+            {canvases.map((canvas) => {
+              const Icon = kindIcons[canvas.kind]
+              return (
+                <CommandItem
+                  key={canvas.id}
+                  value={`drawing ${kindLabels[canvas.kind]} ${canvas.name} ${canvas.id}`}
+                  onSelect={() =>
+                    go(
+                      () =>
+                        void navigate({ to: '/c/$canvasId', params: { canvasId: canvas.id } }),
+                    )
+                  }
+                >
+                  <Icon className="text-muted-foreground" />
+                  <span className="truncate">{canvas.name}</span>
+                </CommandItem>
+              )
+            })}
           </CommandGroup>
           <CommandGroup heading="Cards">
             {cards.slice(0, 200).map((card) => {

@@ -1,6 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
-import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,22 +16,16 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldTitle,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/components/ui/toast'
 import { boardsCollection } from '@/data/collections'
 import { createBoard, newBoard, suggestBoardKey } from '@/data/actions'
-import { type LabelColor, labelColors } from '@/data/schemas'
+import type { LabelColor } from '@/data/schemas'
 import { positionAfterLast } from '@/lib/position'
+import { boardFormSchema } from './board/board-form'
 import { ColorPicker } from './color-picker'
-
-const boardFormSchema = z.object({
-  name: z.string().trim().min(1, 'Give the board a name').max(80),
-  key: z
-    .string()
-    .regex(/^[A-Z][A-Z0-9]{0,5}$/, '1–6 capital letters or digits, starting with a letter'),
-  color: z.enum(labelColors),
-})
 
 export function NewBoardDialog({
   open,
@@ -136,8 +129,8 @@ export function NewBoardDialog({
             </form.Field>
             <form.Field name="color">
               {(field) => (
-                <Field>
-                  <FieldLabel>Color</FieldLabel>
+                <Field aria-labelledby="board-color">
+                  <FieldTitle id="board-color">Color</FieldTitle>
                   <ColorPicker value={field.state.value} onChange={field.handleChange} />
                 </Field>
               )}

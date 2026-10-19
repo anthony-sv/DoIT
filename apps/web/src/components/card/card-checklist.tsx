@@ -83,7 +83,7 @@ export function CardChecklist({ cardId }: { cardId: string }) {
               variant="ghost"
               size="icon-xs"
               aria-label={`Remove “${item.text}”`}
-              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
               onClick={() =>
                 checklistItemsCollection
                   .delete(item.id)

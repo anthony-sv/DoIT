@@ -1,7 +1,7 @@
 # DoIT
 
-Kanban boards, sprints and personal todos. One app today: `apps/web`
-(pnpm workspace, `apps/*`).
+Kanban boards, sprints, personal todos (in sections) and drawings. One app
+today: `apps/web` (pnpm workspace, `apps/*`).
 
 ## Commands (from the repo root)
 
@@ -31,14 +31,27 @@ they win over memory and over other projects' code:
   a server, so server functions can be added later without SSR.
 - **Data**: one TanStack DB Query collection per table
   (`src/data/collections.ts`). Each loads the user's whole table through
-  supabase-js and writes back through it; the adapter refetches after each
-  write. `_app.tsx` preloads them all. Writes that span tables or need ordering
-  (board + its columns, deleting a column) are `createOptimisticAction`s in
-  `src/data/actions.ts`.
+  supabase-js, in pages by id (PostgREST silently caps a response at Max
+  Rows, 1,000 by default), and writes back through it, then refetches the
+  table (handlers return `{ refetch: false }`; the adapter's own refetch is
+  deprecated).
+  `autoIndex: 'eager'` indexes what queries filter, sort and join on; without
+  it dev builds warn on every mount. `_app.tsx` preloads them all. Writes that
+  span tables or need ordering (board + its columns, closing a sprint,
+  deleting a board, sprint, label, column or todo section) are
+  `createOptimisticAction`s in
+  `src/data/actions.ts`; they must refetch every table they touched.
+- **Drawings** (`canvases`): the collection leaves out `data`; the editor
+  page (`src/routes/_app/c/$canvasId.tsx`) reads and writes it itself.
+  Whiteboards are Excalidraw (pinned, lazy-loaded behind an
+  `import.meta.env.SSR` guard so the server bundle stays small), diagrams
+  are draw.io embedded from embed.diagrams.net (`referrerPolicy="no-referrer"`,
+  or it answers 403 on localhost ports).
 - **Security lives in Postgres**, not in route guards: every table has an
   owner-only RLS policy (`src/db/schema.ts`), and triggers in
-  `drizzle/0001_triggers.sql` check that rows point at the same owner's
-  board/card (foreign keys skip RLS) and assign card numbers.
+  `drizzle/0001_triggers.sql` and `0003_sections_canvases_triggers.sql` check
+  that rows point at the same owner's board/card/section (foreign keys skip
+  RLS), assign card numbers, and strip deleted labels off cards.
 - **Rows are snake_case with ISO-string dates**, exactly as Supabase returns
   them (`src/data/schemas.ts`). No mapping layer.
 - **Ordering** uses fractional positions (`src/lib/position.ts`): a drop

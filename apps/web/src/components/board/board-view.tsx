@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { eq, useLiveQuery } from '@tanstack/react-db'
-import { InboxIcon, SearchIcon } from 'lucide-react'
+import { ArchiveIcon, InboxIcon, SearchIcon } from 'lucide-react'
 import { CardSheet } from '@/components/card/card-sheet'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import { Progress } from '@/components/ui/progress'
@@ -27,6 +28,7 @@ import {
 import type { Card, Sprint } from '@/data/schemas'
 import { daysUntil, sprintRange } from '@/lib/format'
 import { BoardColumns } from './board-columns'
+import { BoardMenu } from './board-menu'
 
 const route = getRouteApi('/_app/b/$boardId/')
 
@@ -121,6 +123,12 @@ export function BoardView({ boardId }: { boardId: string }) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
+            {board.archived_at ? (
+              <Badge variant="secondary">
+                <ArchiveIcon data-icon="inline-start" />
+                Archived
+              </Badge>
+            ) : null}
             <SprintPicker
               sprints={sprints}
               value={sprintFilter}
@@ -157,6 +165,7 @@ export function BoardView({ boardId }: { boardId: string }) {
             <InboxIcon data-icon="inline-start" />
             Backlog &amp; sprints
           </Button>
+          <BoardMenu board={board} />
         </div>
       </header>
 

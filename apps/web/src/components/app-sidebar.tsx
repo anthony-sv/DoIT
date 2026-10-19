@@ -1,31 +1,22 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
-import { count, eq, isNull, useLiveQuery } from '@tanstack/react-db'
+import { count, eq, isNull, not, useLiveQuery } from '@tanstack/react-db'
 import {
+  ArchiveIcon,
   CheckIcon,
+  ChevronRightIcon,
   CircleCheckIcon,
   InboxIcon,
   KanbanIcon,
-  LogOutIcon,
-  MonitorIcon,
-  MoonIcon,
   PlusIcon,
   SearchIcon,
-  SunIcon,
 } from 'lucide-react'
+import { AccountMenu } from '@/components/account-menu'
+import { BoardMenu } from '@/components/board/board-menu'
+import { CanvasesGroup } from '@/components/canvas/canvases-group'
 import { NewBoardDialog } from '@/components/new-board-dialog'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Kbd } from '@/components/ui/kbd'
 import {
   Sidebar,
@@ -37,15 +28,19 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
 import { boardsCollection, cardsCollection, todosCollection } from '@/data/collections'
-import { currentUserEmail, signOut } from '@/lib/auth'
+import type { Board } from '@/data/schemas'
 import { colorClasses } from '@/lib/colors'
+import { readLastBoard } from '@/lib/last-board'
 import { cn } from '@/lib/utils'
-import { type Theme, applyTheme, readTheme } from '@/lib/theme'
 import { openCommandPalette } from './command-palette'
 
 export function AppSidebar() {
@@ -58,6 +53,13 @@ export function AppSidebar() {
         .from({ board: boardsCollection })
         .where(({ board }) => isNull(board.archived_at))
         .orderBy(({ board }) => board.position),
+  })
+  const { data: archived } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ board: boardsCollection })
+        .where(({ board }) => not(isNull(board.archived_at)))
+        .orderBy(({ board }) => board.archived_at, 'desc'),
   })
   const { data: openCounts } = useLiveQuery({
     query: (q) =>
@@ -76,7 +78,12 @@ export function AppSidebar() {
   })
   const countFor = (id: string) => openCounts.find((c) => c.board_id === id)?.open ?? 0
   const todoCount = openTodos[0]?.n ?? 0
-  const currentBoard = boards.find((b) => b.id === boardId) ?? boards[0]
+  // On a board, that board, archived or not. Off one (todos, canvases), the
+  // open board you came from.
+  const currentBoard =
+    [...boards, ...archived].find((b) => b.id === boardId) ??
+    boards.find((b) => b.id === readLastBoard()) ??
+    boards[0]
 
   return (
     <Sidebar>
@@ -114,9 +121,27 @@ export function AppSidebar() {
                     render={<Link to="/b/$boardId" params={{ boardId: board.id }} />}
                   >
                     <span className={cn('size-2 shrink-0 rounded-[2px]', colorClasses[board.color].dot)} />
-                    <span className="truncate">{board.name}</span>
+                    {/* Room for the count, which sits left of the options button on
+                        phones and touch screens. */}
+                    <span className="truncate max-md:mr-7 pointer-coarse:mr-7">{board.name}</span>
                   </SidebarMenuButton>
-                  <SidebarMenuBadge>{countFor(board.id)}</SidebarMenuBadge>
+                  {/* Gives way to the options button (hover, focus, menu open); phones
+                      and touch screens always show that button, so there the count
+                      moves left of it. */}
+                  <SidebarMenuBadge className="max-md:right-7 md:group-focus-within/menu-item:hidden md:group-hover/menu-item:hidden md:group-has-aria-expanded/menu-item:hidden pointer-coarse:right-7">
+                    {countFor(board.id)}
+                  </SidebarMenuBadge>
+                  {/* Touch screens can't hover, so there it always shows, with the
+                      larger tap target phones get. */}
+                  <BoardMenu
+                    board={board}
+                    trigger={
+                      <SidebarMenuAction
+                        showOnHover
+                        className="pointer-coarse:opacity-100 pointer-coarse:after:block"
+                      />
+                    }
+                  />
                 </SidebarMenuItem>
               ))}
               {boards.length === 0 ? (
@@ -126,6 +151,9 @@ export function AppSidebar() {
                     Create your first board
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+              ) : null}
+              {archived.length > 0 ? (
+                <ArchivedBoards boards={archived} activeId={boardId} />
               ) : null}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -173,6 +201,8 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        <CanvasesGroup />
       </SidebarContent>
 
       <SidebarFooter>
@@ -184,54 +214,48 @@ export function AppSidebar() {
   )
 }
 
-function AccountMenu() {
-  const [theme, setTheme] = useState<Theme>(readTheme)
-  const email = currentUserEmail()
-
+function ArchivedBoards({ boards, activeId }: { boards: Board[]; activeId: string | undefined }) {
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background uppercase">
-              {email.slice(0, 2)}
-            </span>
-            <span className="truncate text-sm">{email}</span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Theme</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={theme}
-                onValueChange={(value: Theme) => {
-                  setTheme(value)
-                  applyTheme(value)
-                }}
+    <Collapsible
+      render={<SidebarMenuItem />}
+      defaultOpen={boards.some((b) => b.id === activeId)}
+    >
+      <CollapsibleTrigger
+        render={
+          // The rows' option buttons sit inside this item too; without the
+          // override the button would make room for one and its chevron jump.
+          <SidebarMenuButton className="group-has-data-[sidebar=menu-action]/menu-item:pr-2" />
+        }
+      >
+        <ArchiveIcon />
+        <span>Archived ({boards.length})</span>
+        <ChevronRightIcon className="ml-auto transition-transform group-data-panel-open/menu-button:rotate-90" />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <SidebarMenuSub>
+          {boards.map((board) => (
+            <SidebarMenuSubItem key={board.id}>
+              <SidebarMenuSubButton
+                isActive={board.id === activeId}
+                className="pr-8"
+                render={<Link to="/b/$boardId" params={{ boardId: board.id }} />}
               >
-                <DropdownMenuRadioItem value="light">
-                  <SunIcon />
-                  Light
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="dark">
-                  <MoonIcon />
-                  Dark
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="system">
-                  <MonitorIcon />
-                  System
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => void signOut()}>
-                <LogOutIcon />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+                <span className={cn('size-2 shrink-0 rounded-[2px]', colorClasses[board.color].dot)} />
+                <span>{board.name}</span>
+              </SidebarMenuSubButton>
+              <BoardMenu
+                board={board}
+                trigger={
+                  // showOnHover keys off the outer item, which would reveal
+                  // every row's button at once; this keys off the row. Touch
+                  // screens always show it, as for open boards.
+                  <SidebarMenuAction className="top-1 group-focus-within/menu-sub-item:opacity-100 group-hover/menu-sub-item:opacity-100 aria-expanded:opacity-100 md:opacity-0 pointer-coarse:opacity-100 pointer-coarse:after:block" />
+                }
+              />
+            </SidebarMenuSubItem>
+          ))}
+        </SidebarMenuSub>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppTodosRouteImport } from './routes/_app/todos'
 import { Route as AppBBoardIdRouteRouteImport } from './routes/_app/b/$boardId/route'
+import { Route as AppCCanvasIdRouteImport } from './routes/_app/c/$canvasId'
 import { Route as AppBBoardIdIndexRouteImport } from './routes/_app/b/$boardId/index'
 import { Route as AppBBoardIdPlanRouteImport } from './routes/_app/b/$boardId/plan'
 
@@ -41,6 +42,11 @@ const AppBBoardIdRouteRoute = AppBBoardIdRouteRouteImport.update({
   path: '/b/$boardId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCCanvasIdRoute = AppCCanvasIdRouteImport.update({
+  id: '/c/$canvasId',
+  path: '/c/$canvasId',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBBoardIdIndexRoute = AppBBoardIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/todos': typeof AppTodosRoute
   '/b/$boardId': typeof AppBBoardIdRouteRouteWithChildren
+  '/c/$canvasId': typeof AppCCanvasIdRoute
   '/b/$boardId/plan': typeof AppBBoardIdPlanRoute
   '/b/$boardId/': typeof AppBBoardIdIndexRoute
 }
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/todos': typeof AppTodosRoute
   '/': typeof AppIndexRoute
+  '/c/$canvasId': typeof AppCCanvasIdRoute
   '/b/$boardId/plan': typeof AppBBoardIdPlanRoute
   '/b/$boardId': typeof AppBBoardIdIndexRoute
 }
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/_app/todos': typeof AppTodosRoute
   '/_app/': typeof AppIndexRoute
   '/_app/b/$boardId': typeof AppBBoardIdRouteRouteWithChildren
+  '/_app/c/$canvasId': typeof AppCCanvasIdRoute
   '/_app/b/$boardId/plan': typeof AppBBoardIdPlanRoute
   '/_app/b/$boardId/': typeof AppBBoardIdIndexRoute
 }
@@ -84,10 +93,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/todos'
     | '/b/$boardId'
+    | '/c/$canvasId'
     | '/b/$boardId/plan'
     | '/b/$boardId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/todos' | '/' | '/b/$boardId/plan' | '/b/$boardId'
+  to:
+    | '/login'
+    | '/todos'
+    | '/'
+    | '/c/$canvasId'
+    | '/b/$boardId/plan'
+    | '/b/$boardId'
   id:
     | '__root__'
     | '/_app'
@@ -95,6 +111,7 @@ export interface FileRouteTypes {
     | '/_app/todos'
     | '/_app/'
     | '/_app/b/$boardId'
+    | '/_app/c/$canvasId'
     | '/_app/b/$boardId/plan'
     | '/_app/b/$boardId/'
   fileRoutesById: FileRoutesById
@@ -141,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBBoardIdRouteRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/c/$canvasId': {
+      id: '/_app/c/$canvasId'
+      path: '/c/$canvasId'
+      fullPath: '/c/$canvasId'
+      preLoaderRoute: typeof AppCCanvasIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/b/$boardId/': {
       id: '/_app/b/$boardId/'
       path: '/'
@@ -175,12 +199,14 @@ interface AppRouteChildren {
   AppTodosRoute: typeof AppTodosRoute
   AppIndexRoute: typeof AppIndexRoute
   AppBBoardIdRouteRoute: typeof AppBBoardIdRouteRouteWithChildren
+  AppCCanvasIdRoute: typeof AppCCanvasIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppTodosRoute: AppTodosRoute,
   AppIndexRoute: AppIndexRoute,
   AppBBoardIdRouteRoute: AppBBoardIdRouteRouteWithChildren,
+  AppCCanvasIdRoute: AppCCanvasIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

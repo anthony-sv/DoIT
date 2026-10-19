@@ -116,6 +116,8 @@
 }
 
 .dark {
+    /* Native scrollbars and form controls follow the theme too. */
+    color-scheme: dark;
     --background: #0f1115;
     --foreground: #e9ebf0;
     --card: #171a20;
