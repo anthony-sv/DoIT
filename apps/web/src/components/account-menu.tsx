@@ -13,11 +13,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { useHasPassword } from '@/hooks/use-has-password'
 import { currentUserEmail, signOut } from '@/lib/auth'
 import { type Theme, applyTheme, readTheme } from '@/lib/theme'
 
 export function AccountMenu() {
   const [theme, setTheme] = useState<Theme>(readTheme)
+  const passwordSet = useHasPassword()
   const email = currentUserEmail()
 
   return (
@@ -58,7 +60,7 @@ export function AccountMenu() {
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={openPasswordDialog}>
                 <KeyRoundIcon />
-                Set password…
+                {passwordSet ? 'Change password…' : 'Set password…'}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

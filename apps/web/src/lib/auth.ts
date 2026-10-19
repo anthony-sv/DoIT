@@ -36,6 +36,21 @@ export function currentUserEmail(): string {
   return session?.user.email ?? ''
 }
 
+/** Whether the account has a password, as far as the app knows (see changePassword). */
+export function hasPassword(): boolean {
+  return session?.user.user_metadata.has_password === true
+}
+
+/**
+ * Calls `listener` after every auth event (sign-in, token refresh, profile
+ * update, other tabs). `session` above is already up to date by then: its
+ * listener was registered first.
+ */
+export function onAuthChange(listener: () => void) {
+  const { data } = supabase.auth.onAuthStateChange(() => listener())
+  return () => data.subscription.unsubscribe()
+}
+
 export function sendSignInCode(email: string) {
   return supabase.auth.signInWithOtp({
     email,
@@ -128,8 +143,20 @@ export async function changePassword(password: string, nonce?: string): Promise<
  * that started with a password proves one exists, so it marks the account.
  */
 export async function passwordMissing(): Promise<boolean> {
-  const user = (await getSession())?.user
+  let user = (await getSession())?.user
   if (!user || user.user_metadata.has_password) return false
+  // The stored user can predate a password set on another device, which also
+  // ended this session. A refresh gets the account as it is now.
+  const { data: refreshed, error } = await supabase.auth.refreshSession()
+  if (error && !isAuthRetryableFetchError(error)) {
+    // The session is gone server-side, but an explicit refresh leaves it in
+    // storage (supabase-js only drops it on its own next refresh, up to an
+    // hour away). Sign out now; SIGNED_OUT goes to /login.
+    await signOut()
+    return false
+  }
+  if (refreshed.user) user = refreshed.user
+  if (user.user_metadata.has_password) return false
   // The session's sign-in methods, read from its token without a request.
   const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   const methods = (data?.currentAuthenticationMethods ?? []).map((m) =>
