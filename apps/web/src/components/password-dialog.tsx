@@ -21,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/components/ui/toast'
+import { useHasPassword } from '@/hooks/use-has-password'
 import { changePassword, currentUserEmail, passwordMissing } from '@/lib/auth'
 
 const passwordSchema = z
@@ -44,13 +45,15 @@ export function openPasswordDialog() {
 }
 
 /**
- * The Set password dialog, and a reminder while this session started with an
- * emailed code and no password was set. It lives in the app layout rather than
- * the account menu: on phones the sidebar unmounts while it's closed.
+ * The Set (or Change) password dialog, and a reminder while this session
+ * started with an emailed code and no password was set. It lives in the app
+ * layout rather than the account menu: on phones the sidebar unmounts while
+ * it's closed.
  */
 export function PasswordSetup() {
   const [open, setOpen] = useState(false)
   const reminder = useRef<string | null>(null)
+  const passwordSet = useHasPassword()
 
   useEffect(() => {
     const show = () => setOpen(true)
@@ -82,6 +85,7 @@ export function PasswordSetup() {
       <DialogContent>
         {/* Mounts with each opening, so every attempt starts empty. */}
         <PasswordForm
+          changing={passwordSet}
           onDone={() => {
             if (reminder.current) toast.close(reminder.current)
             setOpen(false)
@@ -92,7 +96,10 @@ export function PasswordSetup() {
   )
 }
 
-function PasswordForm({ onDone }: { onDone: () => void }) {
+function PasswordForm({ changing: hadPassword, onDone }: { changing: boolean; onDone: () => void }) {
+  // As it was when the dialog opened: setting the first password flips
+  // useHasPassword mid-submit, and this attempt should still read "Set".
+  const [changing] = useState(hadPassword)
   // Supabase asked to confirm it's really you (see changePassword).
   const [codeSent, setCodeSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,8 +115,10 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
         setCodeSent(true)
       } else {
         toast.add({
-          title: 'Password set',
-          description: 'Next time, sign in with your email and password.',
+          title: changing ? 'Password changed' : 'Password set',
+          description: changing
+            ? 'Use the new one next time you sign in.'
+            : 'Next time, sign in with your email and password.',
           type: 'success',
         })
         onDone()
@@ -127,10 +136,11 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <DialogHeader>
-        <DialogTitle>Set a password</DialogTitle>
+        <DialogTitle>{changing ? 'Change your password' : 'Set a password'}</DialogTitle>
         <DialogDescription>
-          Then you can sign in with your email and this password instead of a code. Setting it
-          signs you out on your other devices.
+          {changing
+            ? 'From now on, sign in with your email and the new password. Changing it signs you out on your other devices.'
+            : 'Then you can sign in with your email and this password instead of a code. Setting it signs you out on your other devices.'}
         </DialogDescription>
       </DialogHeader>
       {/* Tells password managers which account the new password belongs to. */}
@@ -210,7 +220,7 @@ function PasswordForm({ onDone }: { onDone: () => void }) {
           {(isSubmitting) => (
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Spinner data-icon="inline-start" /> : null}
-              Set password
+              {changing ? 'Change password' : 'Set password'}
             </Button>
           )}
         </form.Subscribe>
