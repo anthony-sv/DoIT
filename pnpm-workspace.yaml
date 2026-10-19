@@ -2,3 +2,9 @@ packages:
   - "apps/*"
 allowBuilds:
   esbuild: true
+# Excalidraw 0.18.1 pins @radix-ui/*@1.0.x, whose React peer range stops at 18.
+# They run fine on React 19; this only silences the install warnings.
+peerDependencyRules:
+  allowedVersions:
+    react: "19"
+    react-dom: "19"

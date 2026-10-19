@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { eq, useLiveQuery } from '@tanstack/react-db'
-import { CircleCheckIcon, XIcon } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { CircleCheckIcon } from 'lucide-react'
+import { AddSection, TodoSections } from '@/components/todos/todo-sections'
 import {
   Empty,
   EmptyDescription,
@@ -14,11 +13,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/components/ui/toast'
-import { todosCollection } from '@/data/collections'
-import type { Todo } from '@/data/schemas'
+import { todoSectionsCollection, todosCollection } from '@/data/collections'
 import { currentUserId } from '@/lib/auth'
 import { positionBetween } from '@/lib/position'
-import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/_app/todos')({
   head: () => ({ meta: [{ title: 'My todos · DoIT' }] }),
@@ -31,6 +28,10 @@ function reportFailure(what: string) {
 
 function TodosPage() {
   const [text, setText] = useState('')
+  const { data: sections } = useLiveQuery({
+    query: (q) =>
+      q.from({ section: todoSectionsCollection }).orderBy(({ section }) => section.position),
+  })
   const { data: open } = useLiveQuery({
     query: (q) =>
       q
@@ -43,22 +44,27 @@ function TodosPage() {
       q
         .from({ todo: todosCollection })
         .where(({ todo }) => eq(todo.done, true))
-        .orderBy(({ todo }) => todo.position, 'desc')
-        .limit(20),
+        .orderBy(({ todo }) => todo.position, 'desc'),
   })
 
   function add() {
     const trimmed = text.trim()
     if (!trimmed) return
+    // Newest on top of the inbox, above its completed todos too, so
+    // unchecking one never lands on the same spot as the new one.
+    const inbox = todosCollection.toArray
+      .filter((t) => t.section_id === null)
+      .map((t) => t.position)
+      .sort((a, b) => a - b)
     todosCollection
       .insert({
         id: crypto.randomUUID(),
         owner_id: currentUserId(),
+        section_id: null,
         text: trimmed,
         done: false,
         due_on: null,
-        // Newest on top.
-        position: positionBetween(undefined, open[0]?.position),
+        position: positionBetween(undefined, inbox[0]),
         created_at: new Date().toISOString(),
       })
       .isPersisted.promise.catch(reportFailure('Todo not saved'))
@@ -74,7 +80,7 @@ function TodosPage() {
         </div>
         <h1 className="text-2xl font-bold tracking-tight">My todos</h1>
         <p className="text-sm text-muted-foreground">
-          Small things that don’t need a card. They stay out of every board.
+          Small things that don’t need a card, grouped however you like.
         </p>
       </header>
 
@@ -88,76 +94,27 @@ function TodosPage() {
           autoFocus
           aria-label="New todo"
           placeholder="Add a todo and press Enter"
+          maxLength={300}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
       </form>
 
-      {open.length === 0 && done.length === 0 ? (
+      {sections.length === 0 && open.length === 0 && done.length === 0 ? (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <CircleCheckIcon />
             </EmptyMedia>
             <EmptyTitle>Nothing to do</EmptyTitle>
-            <EmptyDescription>Add a todo above.</EmptyDescription>
+            <EmptyDescription>Add a todo above, or a section below to group them.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
-        <ul className="flex flex-col">
-          {open.map((todo) => (
-            <TodoRow key={todo.id} todo={todo} />
-          ))}
-        </ul>
+        <TodoSections sections={sections} open={open} done={done} />
       )}
 
-      {done.length > 0 ? (
-        <section aria-labelledby="done-heading" className="flex flex-col gap-1">
-          <h2 id="done-heading" className="text-sm font-semibold text-muted-foreground">
-            Done
-          </h2>
-          <ul className="flex flex-col">
-            {done.map((todo) => (
-              <TodoRow key={todo.id} todo={todo} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <AddSection sections={sections} />
     </div>
-  )
-}
-
-function TodoRow({ todo }: { todo: Todo }) {
-  return (
-    <li className="group flex min-h-11 items-center gap-3 border-b">
-      <Checkbox
-        id={`todo-${todo.id}`}
-        checked={todo.done}
-        onCheckedChange={(checked) =>
-          todosCollection
-            .update(todo.id, (d) => {
-              d.done = checked === true
-            })
-            .isPersisted.promise.catch(reportFailure('Todo not saved'))
-        }
-      />
-      <label
-        htmlFor={`todo-${todo.id}`}
-        className={cn('flex-1 text-sm', todo.done && 'text-muted-foreground line-through')}
-      >
-        {todo.text}
-      </label>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`Delete “${todo.text}”`}
-        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-        onClick={() =>
-          todosCollection.delete(todo.id).isPersisted.promise.catch(reportFailure('Todo not deleted'))
-        }
-      >
-        <XIcon />
-      </Button>
-    </li>
   )
 }

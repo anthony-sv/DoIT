@@ -10,6 +10,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgPolicy,
   pgTable,
   text,
@@ -213,16 +214,60 @@ export const cardEvents = pgTable(
   (t) => [index().on(t.cardId), ownerOnly('card_events', t.ownerId)],
 )
 
+export const todoSections = pgTable(
+  'todo_sections',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerId: ownerId(),
+    name: text().notNull(),
+    position: doublePrecision().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.ownerId), ownerOnly('todo_sections', t.ownerId)],
+)
+
 export const todos = pgTable(
   'todos',
   {
     id: uuid().primaryKey().defaultRandom(),
     ownerId: ownerId(),
+    // No section means the inbox. Deleting a section moves its todos there.
+    sectionId: uuid().references(() => todoSections.id, { onDelete: 'set null' }),
     text: text().notNull(),
     done: boolean().notNull().default(false),
     dueOn: date(),
     position: doublePrecision().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.ownerId), ownerOnly('todos', t.ownerId)],
+  (t) => [
+    index().on(t.ownerId),
+    index().on(t.sectionId),
+    ownerOnly('todos', t.ownerId),
+  ],
+)
+
+export const canvasKinds = ['whiteboard', 'diagram'] as const
+
+export const canvases = pgTable(
+  'canvases',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerId: ownerId(),
+    name: text().notNull(),
+    // 'whiteboard' holds an Excalidraw scene, 'diagram' a draw.io file.
+    kind: text().notNull(),
+    position: doublePrecision().notNull(),
+    // The drawing itself. Collections leave it out; the editor loads it.
+    data: jsonb().notNull().default(sql`'{}'::jsonb`),
+    createdAt: createdAt(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.ownerId),
+    check(
+      'canvases_kind_check',
+      sql`${t.kind} in (${sql.raw(canvasKinds.map((k) => `'${k}'`).join(', '))})`,
+    ),
+    ownerOnly('canvases', t.ownerId),
+  ],
 )

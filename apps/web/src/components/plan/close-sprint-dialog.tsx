@@ -13,6 +13,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldSet } from '@/components/ui/field'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/components/ui/toast'
 import { closeSprint } from '@/data/actions'
 import type { Card, Sprint } from '@/data/schemas'
@@ -20,17 +28,30 @@ import type { Card, Sprint } from '@/data/schemas'
 export function CloseSprintDialog({
   sprint,
   unfinished,
-  next,
+  planned,
 }: {
   sprint: Sprint
   unfinished: Card[]
-  next: Sprint | null
+  /** Sprints the unfinished cards can move to, earliest first. */
+  planned: Sprint[]
 }) {
-  const [carry, setCarry] = useState<'next' | 'backlog'>(next ? 'next' : 'backlog')
-  const target = carry === 'next' ? next : null
+  const [carry, setCarry] = useState<'next' | 'backlog'>('next')
+  const [nextId, setNextId] = useState<string | null>(null)
+  const next = planned.find((s) => s.id === nextId) ?? planned[0] ?? null
+  // With nothing planned the cards can only go back to the backlog.
+  const choice = next ? carry : 'backlog'
+  const target = choice === 'next' ? next : null
 
   return (
-    <AlertDialog>
+    <AlertDialog
+      onOpenChange={(open) => {
+        // Each time it opens, suggest the earliest planned sprint.
+        if (open) {
+          setCarry('next')
+          setNextId(null)
+        }
+      }}
+    >
       <AlertDialogTrigger render={<Button variant="outline" />}>
         Close {sprint.name}…
       </AlertDialogTrigger>
@@ -46,19 +67,44 @@ export function CloseSprintDialog({
         {unfinished.length > 0 ? (
           <FieldSet>
             <RadioGroup
-              value={carry}
+              value={choice}
               onValueChange={(value) => setCarry(value === 'next' ? 'next' : 'backlog')}
             >
               <Field orientation="horizontal" data-disabled={!next || undefined}>
                 <RadioGroupItem value="next" id="carry-next" disabled={!next} />
-                <FieldContent>
-                  <FieldLabel htmlFor="carry-next">
-                    Move them to {next ? next.name : 'the next sprint'}
-                  </FieldLabel>
-                  {!next ? (
+                {next ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FieldLabel htmlFor="carry-next">Move them to</FieldLabel>
+                    <Select
+                      value={next.id}
+                      onValueChange={(id) => {
+                        if (!id) return
+                        setNextId(id)
+                        setCarry('next')
+                      }}
+                    >
+                      <SelectTrigger size="sm" aria-label="Sprint to move them to">
+                        <SelectValue>
+                          {(id: string) => planned.find((s) => s.id === id)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {planned.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <FieldContent>
+                    <FieldLabel htmlFor="carry-next">Move them to the next sprint</FieldLabel>
                     <FieldDescription>Plan the next sprint first to use this.</FieldDescription>
-                  ) : null}
-                </FieldContent>
+                  </FieldContent>
+                )}
               </Field>
               <Field orientation="horizontal">
                 <RadioGroupItem value="backlog" id="carry-backlog" />

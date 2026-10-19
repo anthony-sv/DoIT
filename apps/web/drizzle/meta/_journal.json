@@ -15,6 +15,20 @@
       "when": 1792135006519,
       "tag": "0001_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792209487160,
+      "tag": "0002_sections_canvases",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792209501820,
+      "tag": "0003_sections_canvases_triggers",
+      "breakpoints": true
     }
   ]
 }

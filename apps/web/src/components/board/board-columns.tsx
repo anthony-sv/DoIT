@@ -65,9 +65,10 @@ export function BoardColumns({
   const derivedOrder = useMemo(() => columns.map((c) => c.id), [columns])
 
   // During a drag, dnd-kit moves the DOM nodes itself (optimistic sorting)
-  // and React state stays put. After a drop the columns are remounted under a
-  // new key, so React builds fresh DOM instead of reconciling nodes dnd-kit
-  // moved, which otherwise throws "removeChild … not a child of this node".
+  // and React state stays put. After a drop or a cancel the columns are
+  // remounted under a new key, so React builds fresh DOM instead of
+  // reconciling nodes dnd-kit moved, which otherwise throws "removeChild …
+  // not a child of this node".
   const [generation, setGeneration] = useState(0)
   const items = derivedItems
   const order = derivedOrder
@@ -114,10 +115,13 @@ export function BoardColumns({
         sensors={sensors}
         onDragEnd={(event) => {
           const { source, target } = event.operation
-          if (event.canceled || !isSortable(source)) return
-          const id = String(source.id)
-          // Swap in fresh DOM before the data change renders.
+          if (!isSortable(source)) return
+          // dnd-kit moved nodes while dragging, and a cancel doesn't put back a
+          // card dragged into another column. Remount either way, swapping in
+          // fresh DOM before the data change renders.
           flushSync(() => setGeneration((g) => g + 1))
+          if (event.canceled) return
+          const id = String(source.id)
           if (source.type === 'column') {
             dropColumn(id, placeAt(derivedOrder, id, source.sortable.index))
             return

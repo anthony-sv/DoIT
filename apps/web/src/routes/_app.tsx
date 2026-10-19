@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { AppSidebar } from '@/components/app-sidebar'
 import { CommandPalette } from '@/components/command-palette'
+import { PasswordSetup } from '@/components/password-dialog'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { preloadAll } from '@/data/collections'
@@ -28,6 +29,7 @@ function AppLayout() {
           <Outlet />
         </SidebarInset>
         <CommandPalette />
+        <PasswordSetup />
       </SidebarProvider>
     </TooltipProvider>
   )
