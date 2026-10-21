@@ -38,6 +38,22 @@ export const boardSchema = z.object({
 })
 export type Board = z.infer<typeof boardSchema>
 
+// Someone a board is shared with. The owner isn't listed: that's boards.owner_id.
+export const boardMemberSchema = z.object({
+  id,
+  board_id: id,
+  user_id: id,
+  created_at: timestamp,
+})
+export type BoardMember = z.infer<typeof boardMemberSchema>
+
+// Your own email and the emails of everyone you share a board with.
+export const profileSchema = z.object({
+  id,
+  email: z.string(),
+})
+export type Profile = z.infer<typeof profileSchema>
+
 export const columnSchema = z.object({
   id,
   owner_id: id,
@@ -93,6 +109,8 @@ export const cardSchema = z.object({
   position: z.number(),
   backlog_position: z.number(),
   completed_at: timestamp.nullable(),
+  // Who added it; null once that account is deleted.
+  created_by: id.nullable(),
   created_at: timestamp,
   updated_at: timestamp,
 })
@@ -115,6 +133,7 @@ export const cardEventSchema = z.object({
   card_id: id,
   kind: z.string(),
   body: z.string().max(5_000),
+  created_by: id.nullable(),
   created_at: timestamp,
 })
 export type CardEvent = z.infer<typeof cardEventSchema>

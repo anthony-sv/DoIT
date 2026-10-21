@@ -7,3 +7,6 @@ dist
 .env
 .env.local
 *.local
+
+# Copied from node_modules by vite.config.ts
+apps/web/public/excalidraw

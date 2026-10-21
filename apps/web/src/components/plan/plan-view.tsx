@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card as Panel, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/components/ui/toast'
+import { BoardGone } from '@/components/board/board-gone'
 import {
   boardsCollection,
   cardsCollection,
@@ -93,7 +94,7 @@ export function PlanView({ boardId }: { boardId: string }) {
   const closed = sprints.filter((s) => s.state === 'closed').reverse()
   const activeCards = active ? cards.filter((c) => c.sprint_id === active.id) : []
 
-  if (!board) return null
+  if (!board) return <BoardGone />
 
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-[1320px] flex-col gap-5 px-4 py-5 sm:px-7">

@@ -8,15 +8,18 @@ import { queryClient } from '@/lib/query-client'
 import { supabase } from '@/lib/supabase'
 import {
   type Board,
+  type BoardMember,
   type Canvas,
   type Card,
   type CardEvent,
   type ChecklistItem,
   type Column,
   type Label,
+  type Profile,
   type Sprint,
   type Todo,
   type TodoSection,
+  boardMemberSchema,
   boardSchema,
   canvasSchema,
   cardEventSchema,
@@ -24,12 +27,14 @@ import {
   checklistItemSchema,
   columnSchema,
   labelSchema,
+  profileSchema,
   sprintSchema,
   todoSchema,
   todoSectionSchema,
 } from './schemas'
 
-// Columns the database fills in; never sent on insert or update.
+// Columns the database fills in; never sent on insert or update. (owner_id on
+// a board's rows and created_by are sent but overwritten by triggers.)
 const serverOwned = ['created_at', 'updated_at', 'number', 'next_number'] as const
 
 function withoutServerOwned(row: object): Record<string, unknown> {
@@ -133,6 +138,15 @@ function supabaseTable<Row extends { id: string }>(table: string, columns = '*')
 export const boardsCollection = createCollection(
   queryCollectionOptions({ ...supabaseTable<Board>('boards'), schema: boardSchema }),
 )
+// Rows come from invite_board_member() (inviteMember in actions.ts); deletes
+// go through the collection (remove a member, leave a board).
+export const boardMembersCollection = createCollection(
+  queryCollectionOptions({ ...supabaseTable<BoardMember>('board_members'), schema: boardMemberSchema }),
+)
+// Read-only: a trigger on auth.users keeps it.
+export const profilesCollection = createCollection(
+  queryCollectionOptions({ ...supabaseTable<Profile>('profiles'), schema: profileSchema }),
+)
 export const columnsCollection = createCollection(
   queryCollectionOptions({ ...supabaseTable<Column>('columns'), schema: columnSchema }),
 )
@@ -174,6 +188,8 @@ export const canvasesCollection = createCollection(
 
 const allCollections = [
   boardsCollection,
+  boardMembersCollection,
+  profilesCollection,
   columnsCollection,
   sprintsCollection,
   labelsCollection,

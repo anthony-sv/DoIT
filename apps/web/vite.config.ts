@@ -1,4 +1,5 @@
-import { defineConfig, loadEnv } from 'vite'
+import { cpSync, existsSync } from 'node:fs'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import { nitro } from 'nitro/vite'
 import viteReact from '@vitejs/plugin-react'
@@ -14,11 +15,26 @@ if (process.env.VERCEL) {
   }
 }
 
+// Excalidraw fetches its canvas fonts at runtime, from esm.sh unless
+// window.EXCALIDRAW_ASSET_PATH points elsewhere. Copy them into public/ (git
+// ignores them) so the app serves them itself and nothing leaves the network.
+function excalidrawFonts(): Plugin {
+  const from = 'node_modules/@excalidraw/excalidraw/dist/prod/fonts'
+  const to = 'public/excalidraw/fonts'
+  return {
+    name: 'doit:excalidraw-fonts',
+    configResolved() {
+      if (!existsSync(to)) cpSync(from, to, { recursive: true })
+    },
+  }
+}
+
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   // A different port is a different origin: no saved session, so a new sign-in.
   server: { port: 5310, strictPort: true },
   plugins: [
+    excalidrawFonts(),
     devtools(),
     // Start must come before react(). It also breaks Vitest's resolution, so
     // tests run without it.

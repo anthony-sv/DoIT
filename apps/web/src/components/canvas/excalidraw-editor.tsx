@@ -1,7 +1,8 @@
 // Whiteboard editor. Only ever loaded through React.lazy (see the canvas
 // route): Excalidraw is ~1 MB of JS + 145 KB of CSS and touches `window` at
 // import time, so it must stay out of the main bundle and out of anything the
-// server evaluates. Its canvas fonts load from Excalidraw's CDN (esm.sh).
+// server evaluates. Its canvas fonts are served by the app (excalidraw-assets).
+import './excalidraw-assets'
 import '@excalidraw/excalidraw/index.css'
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import {
