@@ -46,7 +46,11 @@ they win over memory and over other projects' code:
   Whiteboards are Excalidraw (pinned, lazy-loaded behind an
   `import.meta.env.SSR` guard so the server bundle stays small), diagrams
   are draw.io embedded from embed.diagrams.net (`referrerPolicy="no-referrer"`,
-  or it answers 403 on localhost ports).
+  or it answers 403 on localhost ports) or from `VITE_DRAWIO_URL`.
+  Excalidraw's fonts are copied into `public/excalidraw` by `vite.config.ts`
+  and served by the app, never fetched from esm.sh.
+- **Local mode**: `apps/web/supabase` configures `npx supabase start` (local
+  Supabase in Docker); README "Run it on your own network" has the steps.
 - **Security lives in Postgres**, not in route guards: every table has an
   owner-only RLS policy (`src/db/schema.ts`), and triggers in
   `drizzle/0001_triggers.sql` and `0003_sections_canvases_triggers.sql` check

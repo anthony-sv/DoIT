@@ -40,6 +40,46 @@ only signs out that browser.
 
 Google works the same way with `VITE_AUTH_PROVIDERS=github,google`.
 
+## Run it on your own network
+
+Nothing has to leave your machine or company network. DoIT talks to three
+outside services, and each can be replaced:
+
+| Service | Default | Local replacement |
+| --- | --- | --- |
+| Database and auth | Supabase cloud | Supabase on your machine or server |
+| Diagram editor | embed.diagrams.net | the `jgraph/drawio` image (`VITE_DRAWIO_URL`) |
+| OAuth sign-in | GitHub, Google | leave `VITE_AUTH_PROVIDERS` empty |
+
+Whiteboard fonts are always served by the app itself (`vite.config.ts` copies
+them into `public/excalidraw`), so Excalidraw doesn't fetch anything either.
+
+With Docker installed:
+
+1. Start Supabase from `apps/web` (its settings are in `apps/web/supabase`):
+   ```sh
+   cd apps/web
+   npx supabase start
+   npx supabase status
+   ```
+2. Start draw.io: `docker run -d --name drawio -p 8080:8080 jgraph/drawio`.
+3. `cp apps/web/.env.example apps/web/.env` and set:
+   - `VITE_SUPABASE_URL=http://127.0.0.1:54321`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`: the publishable key that
+     `supabase status` prints
+   - `VITE_DRAWIO_URL=http://localhost:8080`
+   - `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres`
+4. `pnpm --filter web db:migrate`, then `pnpm dev`.
+
+Sign-in emails don't go out: open Mailpit at http://127.0.0.1:54324 to read
+the code. Supabase Studio is at http://127.0.0.1:54323. `npx supabase stop`
+keeps the data; `npx supabase stop --no-backup` deletes it.
+
+For a team, run the same pieces on a company server instead: [self-hosted
+Supabase](https://supabase.com/docs/guides/self-hosting/docker) and the draw.io
+image, with the URLs above pointing at that server and real SMTP for the
+codes. `VITE_` values are inlined at build time, so build after setting them.
+
 ## Deploy (Vercel)
 
 1. Vercel → Add New → Project → import this repo.
@@ -72,7 +112,8 @@ on codes. Free Supabase projects pause after a week without activity.
 ## Drawings
 
 Whiteboards use [Excalidraw](https://excalidraw.com). Diagrams use the real
-draw.io editor, embedded from embed.diagrams.net; the diagram itself stays in
+draw.io editor, embedded from embed.diagrams.net or your own draw.io
+(`VITE_DRAWIO_URL`); the diagram itself stays in
 your browser and in Supabase. Each drawing exports as a PNG, as its native
 file (`.excalidraw` or `.drawio`, which open in excalidraw.com and draw.io), or
 as a DoIT JSON file, and imports any of the three. tldraw files (`.tldr`)

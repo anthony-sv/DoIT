@@ -4,7 +4,9 @@
 import { useEffect, useId, useImperativeHandle, useRef, type Ref } from 'react'
 import { type CanvasEditorHandle, type Debounced, type DiagramData, debounce } from './canvas-file'
 
-const DRAWIO_ORIGIN = 'https://embed.diagrams.net'
+// A self-hosted draw.io (the jgraph/drawio image) keeps diagrams off the internet.
+const DRAWIO_URL = import.meta.env.VITE_DRAWIO_URL || 'https://embed.diagrams.net/'
+const DRAWIO_ORIGIN = new URL(DRAWIO_URL).origin
 
 // draw.io keeps Tab/Shift+Tab (they select shapes). While a shape is selected its
 // typing shim cancels F6/Alt+D, and Ctrl/Cmd+L is its Lock/Unlock, so no key leaves
@@ -57,7 +59,9 @@ function editorUrl(dark: boolean) {
     // No usage logging to draw.io, no cloud integrations, no server-side export.
     stealth: '1',
   })
-  return `${DRAWIO_ORIGIN}/?${params}`
+  const url = new URL(DRAWIO_URL)
+  url.search = params.toString()
+  return url.toString()
 }
 
 /**
