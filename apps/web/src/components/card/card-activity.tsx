@@ -6,9 +6,11 @@ import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast'
-import { cardEventsCollection } from '@/data/collections'
+import { boardMembersCollection, cardEventsCollection } from '@/data/collections'
 import { logEvent } from '@/data/actions'
 import type { Card } from '@/data/schemas'
+import { useEmails } from '@/hooks/use-board-people'
+import { currentUserId } from '@/lib/auth'
 
 function reportFailure(what: string) {
   return (error: Error) => toast.add({ title: what, description: error.message, type: 'error' })
@@ -18,8 +20,29 @@ function ago(iso: string) {
   return formatDistanceToNow(parseISO(iso), { addSuffix: true })
 }
 
+/**
+ * Who did something, on a shared board only: alone on a board, it's always you.
+ * Null when it isn't worth saying.
+ */
+function useAuthor(boardId: string) {
+  const emails = useEmails()
+  const { data: members } = useLiveQuery(
+    (q) =>
+      q.from({ member: boardMembersCollection }).where(({ member }) => eq(member.board_id, boardId)),
+    [boardId],
+  )
+  const shared = members.length > 0
+  return (userId: string | null) => {
+    if (!shared) return null
+    if (userId === null) return 'A former member'
+    return userId === currentUserId() ? 'You' : (emails.get(userId) ?? 'Someone')
+  }
+}
+
 export function CardActivity({ card }: { card: Card }) {
   const [comment, setComment] = useState('')
+  const author = useAuthor(card.board_id)
+  const creator = author(card.created_by)
   const { data: events } = useLiveQuery({
     query: (q) =>
       q
@@ -65,7 +88,7 @@ export function CardActivity({ card }: { card: Card }) {
               <>
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-xs text-muted-foreground">
-                    Comment · {ago(event.created_at)}
+                    {author(event.created_by) ?? 'Comment'} · {ago(event.created_at)}
                   </span>
                   <div className="prose-doit">
                     <Markdown>{event.body}</Markdown>
@@ -88,6 +111,7 @@ export function CardActivity({ card }: { card: Card }) {
               </>
             ) : (
               <span className="text-muted-foreground">
+                {author(event.created_by) ? `${author(event.created_by)} · ` : ''}
                 {event.kind === 'moved' ? 'Moved ' : ''}
                 <span className="font-medium text-foreground">{event.body}</span> ·{' '}
                 {ago(event.created_at)}
@@ -97,7 +121,8 @@ export function CardActivity({ card }: { card: Card }) {
         ))}
         <li className="flex gap-2.5 text-muted-foreground">
           <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground/60" />
-          Created · {ago(card.created_at)}
+          {creator ? `Created by ${creator === 'You' ? 'you' : creator}` : 'Created'} ·{' '}
+          {ago(card.created_at)}
         </li>
       </ol>
     </section>

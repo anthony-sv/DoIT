@@ -1,7 +1,7 @@
 # DoIT
 
 Kanban boards with custom columns, drag and drop, sprints with a burndown,
-a personal todo list in sections, and drawings: whiteboards (Excalidraw) and
+boards shared with teammates (live updates), a personal todo list in sections, and drawings: whiteboards (Excalidraw) and
 diagrams (draw.io). React 19 · TanStack Start · TanStack DB · Supabase.
 
 ## Set up
@@ -39,6 +39,15 @@ only signs out that browser.
    matches your account's, it signs into the same account.
 
 Google works the same way with `VITE_AUTH_PROVIDERS=github,google`.
+
+## Sharing boards
+
+Choose **Share** on a board and add someone by email. They need to have
+signed in to DoIT once. Everyone on a board can see and change everything on
+it; only its owner can share it, archive it or delete it, and members can
+leave. Todos and drawings are never shared. Changes show up for everyone
+within a second (Supabase Realtime; migration `0007` adds the board tables to
+its publication).
 
 ## Run it on your own network
 

@@ -15,6 +15,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
 import { authUsers, authenticatedRole } from 'drizzle-orm/supabase'
@@ -29,8 +30,8 @@ const ownerId = () =>
 
 const createdAt = () => timestamp({ withTimezone: true }).notNull().defaultNow()
 
-// Every table is private to its owner: one policy covers select, insert,
-// update and delete.
+// Private tables (todos, sections, drawings) belong to one user: one policy
+// covers select, insert, update and delete.
 const ownerOnly = (table: string, owner: AnyPgColumn) =>
   pgPolicy(`${table}_owner_all`, {
     for: 'all',
@@ -48,6 +49,34 @@ export const labelColors = [
   'green',
   'gray',
 ] as const
+
+// Boards are shared through board_members. Everything on a board (columns,
+// sprints, labels, cards and their checklists and activity) is open to its
+// owner and its members. The functions are SECURITY DEFINER (migration 0004),
+// so they read boards and board_members without recursing into these policies.
+// owner_id on those rows is always the board's owner, set by triggers.
+const boardMembersAll = (table: string, boardId: AnyPgColumn) =>
+  pgPolicy(`${table}_member_all`, {
+    for: 'all',
+    to: authenticatedRole,
+    using: sql`public.has_board_access(${boardId})`,
+    withCheck: sql`public.has_board_access(${boardId})`,
+  })
+
+const cardMembersAll = (table: string, cardId: AnyPgColumn) =>
+  pgPolicy(`${table}_member_all`, {
+    for: 'all',
+    to: authenticatedRole,
+    using: sql`public.has_card_access(${cardId})`,
+    withCheck: sql`public.has_card_access(${cardId})`,
+  })
+
+// Who wrote a card or an activity entry. A trigger sets it on insert, so it
+// can't be forged, and keeps it on update. Null once that user is deleted.
+const createdBy = () =>
+  uuid()
+    .default(sql`auth.uid()`)
+    .references(() => authUsers.id, { onDelete: 'set null' })
 
 const colorCheck = (table: string, column: AnyPgColumn) =>
   check(
@@ -72,7 +101,80 @@ export const boards = pgTable(
   (t) => [
     index().on(t.ownerId),
     colorCheck('boards', t.color),
-    ownerOnly('boards', t.ownerId),
+    // Members see and edit the board; a trigger keeps its owner, archive state
+    // and sidebar position for the owner to change. Only the owner deletes it.
+    pgPolicy('boards_select', {
+      for: 'select',
+      to: authenticatedRole,
+      using: sql`public.has_board_access(${t.id})`,
+    }),
+    pgPolicy('boards_insert', {
+      for: 'insert',
+      to: authenticatedRole,
+      withCheck: sql`${t.ownerId} = (select auth.uid())`,
+    }),
+    pgPolicy('boards_update', {
+      for: 'update',
+      to: authenticatedRole,
+      using: sql`public.has_board_access(${t.id})`,
+      withCheck: sql`public.has_board_access(${t.id})`,
+    }),
+    pgPolicy('boards_delete', {
+      for: 'delete',
+      to: authenticatedRole,
+      using: sql`${t.ownerId} = (select auth.uid())`,
+    }),
+  ],
+)
+
+// The people a board is shared with, besides its owner. Rows come only from
+// invite_board_member() (migration 0006), which only the owner can call. The
+// owner removes anyone; a member can remove themselves (leave).
+export const boardMembers = pgTable(
+  'board_members',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    boardId: uuid()
+      .notNull()
+      .references(() => boards.id, { onDelete: 'cascade' }),
+    userId: uuid()
+      .notNull()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex().on(t.boardId, t.userId),
+    index().on(t.userId),
+    pgPolicy('board_members_select', {
+      for: 'select',
+      to: authenticatedRole,
+      using: sql`public.has_board_access(${t.boardId})`,
+    }),
+    pgPolicy('board_members_delete', {
+      for: 'delete',
+      to: authenticatedRole,
+      using: sql`${t.userId} = (select auth.uid()) or public.is_board_owner(${t.boardId})`,
+    }),
+  ],
+)
+
+// The email of everyone you share a board with (and your own), so boards can
+// show who's on them and who wrote what. auth.users stays private: a trigger
+// on it keeps this copy (migration 0006), and no one writes it directly.
+export const profiles = pgTable(
+  'profiles',
+  {
+    id: uuid()
+      .primaryKey()
+      .references(() => authUsers.id, { onDelete: 'cascade' }),
+    email: text().notNull().default(''),
+  },
+  (t) => [
+    pgPolicy('profiles_select', {
+      for: 'select',
+      to: authenticatedRole,
+      using: sql`${t.id} = (select auth.uid()) or public.shares_board_with(${t.id})`,
+    }),
   ],
 )
 
@@ -96,7 +198,7 @@ export const columns = pgTable(
     index().on(t.boardId),
     colorCheck('columns', t.color),
     check('columns_wip_limit_check', sql`${t.wipLimit} is null or ${t.wipLimit} > 0`),
-    ownerOnly('columns', t.ownerId),
+    boardMembersAll('columns', t.boardId),
   ],
 )
 
@@ -120,7 +222,7 @@ export const sprints = pgTable(
     index().on(t.boardId),
     check('sprints_state_check', sql`${t.state} in ('planned', 'active', 'closed')`),
     check('sprints_dates_check', sql`${t.endsOn} >= ${t.startsOn}`),
-    ownerOnly('sprints', t.ownerId),
+    boardMembersAll('sprints', t.boardId),
   ],
 )
 
@@ -139,7 +241,7 @@ export const labels = pgTable(
   (t) => [
     index().on(t.boardId),
     colorCheck('labels', t.color),
-    ownerOnly('labels', t.ownerId),
+    boardMembersAll('labels', t.boardId),
   ],
 )
 
@@ -166,6 +268,7 @@ export const cards = pgTable(
     position: doublePrecision().notNull(),
     backlogPosition: doublePrecision().notNull(),
     completedAt: timestamp({ withTimezone: true }),
+    createdBy: createdBy(),
     createdAt: createdAt(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -177,7 +280,7 @@ export const cards = pgTable(
       'cards_priority_check',
       sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`,
     ),
-    ownerOnly('cards', t.ownerId),
+    boardMembersAll('cards', t.boardId),
   ],
 )
 
@@ -194,7 +297,7 @@ export const checklistItems = pgTable(
     position: doublePrecision().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.cardId), ownerOnly('checklist_items', t.ownerId)],
+  (t) => [index().on(t.cardId), cardMembersAll('checklist_items', t.cardId)],
 )
 
 export const cardEvents = pgTable(
@@ -209,9 +312,10 @@ export const cardEvents = pgTable(
     // UI ignores kinds it does not know.
     kind: text().notNull(),
     body: text().notNull().default(''),
+    createdBy: createdBy(),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.cardId), ownerOnly('card_events', t.ownerId)],
+  (t) => [index().on(t.cardId), cardMembersAll('card_events', t.cardId)],
 )
 
 export const todoSections = pgTable(

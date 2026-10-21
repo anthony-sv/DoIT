@@ -29,6 +29,34 @@
       "when": 1792209501820,
       "tag": "0003_sections_canvases_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792565185930,
+      "tag": "0004_sharing_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792565223939,
+      "tag": "0005_sharing_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792565229438,
+      "tag": "0006_sharing_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792565241522,
+      "tag": "0007_sharing_triggers",
+      "breakpoints": true
     }
   ]
 }

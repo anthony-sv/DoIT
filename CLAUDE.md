@@ -51,11 +51,22 @@ they win over memory and over other projects' code:
   and served by the app, never fetched from esm.sh.
 - **Local mode**: `apps/web/supabase` configures `npx supabase start` (local
   Supabase in Docker); README "Run it on your own network" has the steps.
-- **Security lives in Postgres**, not in route guards: every table has an
-  owner-only RLS policy (`src/db/schema.ts`), and triggers in
-  `drizzle/0001_triggers.sql` and `0003_sections_canvases_triggers.sql` check
-  that rows point at the same owner's board/card/section (foreign keys skip
-  RLS), assign card numbers, and strip deleted labels off cards.
+- **Security lives in Postgres**, not in route guards (`src/db/schema.ts`).
+  Todos, sections and drawings have owner-only RLS policies. Boards are
+  shared per board through `board_members` (owner + members, no roles):
+  every board table's policy calls `has_board_access()` /
+  `has_card_access()` (SECURITY DEFINER, `drizzle/0004_sharing_functions.sql`).
+  Triggers (`0001`, `0003`, `0007_sharing_triggers.sql`) check that rows
+  point at a board/card/section the caller can open (foreign keys skip RLS),
+  set `owner_id` on board rows to the board's owner and `created_by` to the
+  writer, keep archiving/position/deleting for the owner, assign card
+  numbers, and strip deleted labels off cards. Sharing goes through the
+  `invite_board_member()` RPC; `profiles` mirrors auth.users emails for
+  people who share a board. `src/db/policies.test.ts` runs every migration
+  in PGlite and checks all of this as different users: extend it with any
+  policy or trigger change.
+- **Live updates**: `src/data/realtime.ts` subscribes to Supabase Realtime
+  for the board tables and refetches the affected collections.
 - **Rows are snake_case with ISO-string dates**, exactly as Supabase returns
   them (`src/data/schemas.ts`). No mapping layer.
 - **Ordering** uses fractional positions (`src/lib/position.ts`): a drop

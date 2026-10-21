@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
 import { AppSidebar } from '@/components/app-sidebar'
 import { CommandPalette } from '@/components/command-palette'
@@ -5,6 +6,7 @@ import { PasswordSetup } from '@/components/password-dialog'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { preloadAll } from '@/data/collections'
+import { subscribeToBoardChanges } from '@/data/realtime'
 import { getSession } from '@/lib/auth'
 
 // Everything signed-in lives under this layout. The guard is navigation UX;
@@ -21,6 +23,9 @@ export const Route = createFileRoute('/_app')({
 })
 
 function AppLayout() {
+  // Teammates' changes on shared boards show up without a reload.
+  useEffect(() => subscribeToBoardChanges(), [])
+
   return (
     <TooltipProvider>
       <SidebarProvider>

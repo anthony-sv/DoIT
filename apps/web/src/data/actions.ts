@@ -8,17 +8,28 @@ import { positionAfterLast } from '@/lib/position'
 import { nextSprintName } from '@/lib/sprints'
 import { supabase } from '@/lib/supabase'
 import {
+  boardMembersCollection,
   boardsCollection,
   cardEventsCollection,
   cardsCollection,
   checklistItemsCollection,
   columnsCollection,
   labelsCollection,
+  profilesCollection,
   sprintsCollection,
   todoSectionsCollection,
   todosCollection,
 } from './collections'
-import type { Board, Card, Column, Label, LabelColor, Sprint, TodoSection } from './schemas'
+import type {
+  Board,
+  BoardMember,
+  Card,
+  Column,
+  Label,
+  LabelColor,
+  Sprint,
+  TodoSection,
+} from './schemas'
 
 const now = () => new Date().toISOString()
 export const today = () => format(new Date(), 'yyyy-MM-dd')
@@ -141,32 +152,69 @@ export function removeBoard(board: Board) {
   return deleteBoard(board.id)
 }
 
+// Every row on a board, gone from the local collections at once.
+function dropBoardLocally(boardId: string) {
+  const cardIds = new Set(
+    cardsCollection.toArray.filter((c) => c.board_id === boardId).map((c) => c.id),
+  )
+  deleteWhere(cardEventsCollection, (e) => cardIds.has(e.card_id))
+  deleteWhere(checklistItemsCollection, (i) => cardIds.has(i.card_id))
+  deleteWhere(cardsCollection, (c) => cardIds.has(c.id))
+  deleteWhere(labelsCollection, (l) => l.board_id === boardId)
+  deleteWhere(sprintsCollection, (s) => s.board_id === boardId)
+  deleteWhere(columnsCollection, (c) => c.board_id === boardId)
+  deleteWhere(boardMembersCollection, (m) => m.board_id === boardId)
+  deleteWhere(boardsCollection, (b) => b.id === boardId)
+}
+
+const boardCollections = [
+  boardsCollection,
+  boardMembersCollection,
+  columnsCollection,
+  sprintsCollection,
+  labelsCollection,
+  cardsCollection,
+  checklistItemsCollection,
+  cardEventsCollection,
+]
+
 const deleteBoard = createOptimisticAction<string>({
-  onMutate: (boardId) => {
-    const cardIds = new Set(
-      cardsCollection.toArray.filter((c) => c.board_id === boardId).map((c) => c.id),
-    )
-    deleteWhere(cardEventsCollection, (e) => cardIds.has(e.card_id))
-    deleteWhere(checklistItemsCollection, (i) => cardIds.has(i.card_id))
-    deleteWhere(cardsCollection, (c) => cardIds.has(c.id))
-    deleteWhere(labelsCollection, (l) => l.board_id === boardId)
-    deleteWhere(sprintsCollection, (s) => s.board_id === boardId)
-    deleteWhere(columnsCollection, (c) => c.board_id === boardId)
-    deleteWhere(boardsCollection, (b) => b.id === boardId)
-  },
+  onMutate: dropBoardLocally,
   mutationFn: async (boardId) => {
     await check(supabase.from('boards').delete().eq('id', boardId))
-    await Promise.all(
-      [
-        boardsCollection,
-        columnsCollection,
-        sprintsCollection,
-        labelsCollection,
-        cardsCollection,
-        checklistItemsCollection,
-        cardEventsCollection,
-      ].map((c) => c.utils.refetch()),
+    await Promise.all(boardCollections.map((c) => c.utils.refetch()))
+  },
+})
+
+// ── Sharing ──────────────────────────────────────────────────────────────
+
+/**
+ * Share a board with the DoIT account that uses `email`. Postgres checks that
+ * the caller owns the board and that the account exists, and says why not.
+ * Not optimistic: until it answers, there's no user to show.
+ */
+export async function inviteMember(board: Board, email: string) {
+  await check(supabase.rpc('invite_board_member', { board: board.id, email: email.trim() }))
+  await Promise.all([boardMembersCollection.utils.refetch(), profilesCollection.utils.refetch()])
+}
+
+/** The owner takes someone off a board. */
+export function removeMember(member: BoardMember) {
+  return boardMembersCollection.delete(member.id)
+}
+
+/** A member takes themselves off someone else's board; it leaves at once. */
+export function leaveSharedBoard(board: Board) {
+  return leaveBoardAction(board.id)
+}
+
+const leaveBoardAction = createOptimisticAction<string>({
+  onMutate: dropBoardLocally,
+  mutationFn: async (boardId) => {
+    await check(
+      supabase.from('board_members').delete().eq('board_id', boardId).eq('user_id', currentUserId()),
     )
+    await Promise.all([...boardCollections, profilesCollection].map((c) => c.utils.refetch()))
   },
 })
 
@@ -219,6 +267,7 @@ export function addCard(input: {
     position: input.position,
     backlog_position: input.backlogPosition,
     completed_at: input.column.is_done ? now() : null,
+    created_by: currentUserId(),
     created_at: now(),
     updated_at: now(),
   }
@@ -232,6 +281,7 @@ export function logEvent(cardId: string, kind: string, body: string) {
     card_id: cardId,
     kind,
     body,
+    created_by: currentUserId(),
     created_at: now(),
   })
 }

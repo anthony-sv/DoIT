@@ -26,9 +26,12 @@ import {
   sprintsCollection,
 } from '@/data/collections'
 import type { Card, Sprint } from '@/data/schemas'
+import { currentUserId } from '@/lib/auth'
 import { daysUntil, sprintRange } from '@/lib/format'
+import { BoardGone } from './board-gone'
 import { BoardColumns } from './board-columns'
 import { BoardMenu } from './board-menu'
+import { ShareBoardButton } from './share-board-dialog'
 
 const route = getRouteApi('/_app/b/$boardId/')
 
@@ -111,7 +114,7 @@ export function BoardView({ boardId }: { boardId: string }) {
 
   const openCard = search.card ? cards.find((c) => c.id === search.card) : undefined
 
-  if (!board) return null
+  if (!board) return <BoardGone />
 
   return (
     <div className="flex min-h-svh flex-col gap-5 px-4 py-5 sm:px-7">
@@ -119,7 +122,7 @@ export function BoardView({ boardId }: { boardId: string }) {
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <SidebarTrigger className="-ml-1.5 md:hidden" />
-            Boards / {board.name}
+            {board.owner_id === currentUserId() ? 'Boards' : 'Shared with me'} / {board.name}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold tracking-tight">{board.name}</h1>
@@ -165,6 +168,7 @@ export function BoardView({ boardId }: { boardId: string }) {
             <InboxIcon data-icon="inline-start" />
             Backlog &amp; sprints
           </Button>
+          <ShareBoardButton board={board} />
           <BoardMenu board={board} />
         </div>
       </header>

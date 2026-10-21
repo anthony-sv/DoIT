@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from '@tanstack/react-router'
-import { count, eq, isNull, not, useLiveQuery } from '@tanstack/react-db'
+import { and, count, eq, isNull, not, useLiveQuery } from '@tanstack/react-db'
 import {
   ArchiveIcon,
   CheckIcon,
@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/sidebar'
 import { boardsCollection, cardsCollection, todosCollection } from '@/data/collections'
 import type { Board } from '@/data/schemas'
+import { currentUserId } from '@/lib/auth'
 import { colorClasses } from '@/lib/colors'
 import { readLastBoard } from '@/lib/last-board'
 import { cn } from '@/lib/utils'
@@ -47,12 +48,22 @@ export function AppSidebar() {
   const { boardId } = useParams({ strict: false })
   const [newBoardOpen, setNewBoardOpen] = useState(false)
 
+  const you = currentUserId()
+  // Your boards in your order. Shared ones by name: their position is their
+  // owner's sidebar order, which only the owner can change.
   const { data: boards } = useLiveQuery({
     query: (q) =>
       q
         .from({ board: boardsCollection })
-        .where(({ board }) => isNull(board.archived_at))
+        .where(({ board }) => and(isNull(board.archived_at), eq(board.owner_id, you)))
         .orderBy(({ board }) => board.position),
+  })
+  const { data: shared } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ board: boardsCollection })
+        .where(({ board }) => and(isNull(board.archived_at), not(eq(board.owner_id, you))))
+        .orderBy(({ board }) => board.name),
   })
   const { data: archived } = useLiveQuery({
     query: (q) =>
@@ -81,9 +92,10 @@ export function AppSidebar() {
   // On a board, that board, archived or not. Off one (todos, canvases), the
   // open board you came from.
   const currentBoard =
-    [...boards, ...archived].find((b) => b.id === boardId) ??
-    boards.find((b) => b.id === readLastBoard()) ??
-    boards[0]
+    [...boards, ...shared, ...archived].find((b) => b.id === boardId) ??
+    [...boards, ...shared].find((b) => b.id === readLastBoard()) ??
+    boards[0] ??
+    shared[0]
 
   return (
     <Sidebar>
@@ -115,34 +127,12 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {boards.map((board) => (
-                <SidebarMenuItem key={board.id}>
-                  <SidebarMenuButton
-                    isActive={board.id === boardId}
-                    render={<Link to="/b/$boardId" params={{ boardId: board.id }} />}
-                  >
-                    <span className={cn('size-2 shrink-0 rounded-[2px]', colorClasses[board.color].dot)} />
-                    {/* Room for the count, which sits left of the options button on
-                        phones and touch screens. */}
-                    <span className="truncate max-md:mr-7 pointer-coarse:mr-7">{board.name}</span>
-                  </SidebarMenuButton>
-                  {/* Gives way to the options button (hover, focus, menu open); phones
-                      and touch screens always show that button, so there the count
-                      moves left of it. */}
-                  <SidebarMenuBadge className="max-md:right-7 md:group-focus-within/menu-item:hidden md:group-hover/menu-item:hidden md:group-has-aria-expanded/menu-item:hidden pointer-coarse:right-7">
-                    {countFor(board.id)}
-                  </SidebarMenuBadge>
-                  {/* Touch screens can't hover, so there it always shows, with the
-                      larger tap target phones get. */}
-                  <BoardMenu
-                    board={board}
-                    trigger={
-                      <SidebarMenuAction
-                        showOnHover
-                        className="pointer-coarse:opacity-100 pointer-coarse:after:block"
-                      />
-                    }
-                  />
-                </SidebarMenuItem>
+                <BoardRow
+                  key={board.id}
+                  board={board}
+                  active={board.id === boardId}
+                  open={countFor(board.id)}
+                />
               ))}
               {boards.length === 0 ? (
                 <SidebarMenuItem>
@@ -158,6 +148,24 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {shared.length > 0 ? (
+          <SidebarGroup>
+            <SidebarGroupLabel>Shared with me</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {shared.map((board) => (
+                  <BoardRow
+                    key={board.id}
+                    board={board}
+                    active={board.id === boardId}
+                    open={countFor(board.id)}
+                  />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : null}
 
         <SidebarGroup>
           <SidebarGroupLabel>Plan</SidebarGroupLabel>
@@ -211,6 +219,39 @@ export function AppSidebar() {
 
       <NewBoardDialog open={newBoardOpen} onOpenChange={setNewBoardOpen} />
     </Sidebar>
+  )
+}
+
+function BoardRow({ board, active, open }: { board: Board; active: boolean; open: number }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={active}
+        render={<Link to="/b/$boardId" params={{ boardId: board.id }} />}
+      >
+        <span className={cn('size-2 shrink-0 rounded-[2px]', colorClasses[board.color].dot)} />
+        {/* Room for the count, which sits left of the options button on
+            phones and touch screens. */}
+        <span className="truncate max-md:mr-7 pointer-coarse:mr-7">{board.name}</span>
+      </SidebarMenuButton>
+      {/* Gives way to the options button (hover, focus, menu open); phones
+          and touch screens always show that button, so there the count
+          moves left of it. */}
+      <SidebarMenuBadge className="max-md:right-7 md:group-focus-within/menu-item:hidden md:group-hover/menu-item:hidden md:group-has-aria-expanded/menu-item:hidden pointer-coarse:right-7">
+        {open}
+      </SidebarMenuBadge>
+      {/* Touch screens can't hover, so there it always shows, with the
+          larger tap target phones get. */}
+      <BoardMenu
+        board={board}
+        trigger={
+          <SidebarMenuAction
+            showOnHover
+            className="pointer-coarse:opacity-100 pointer-coarse:after:block"
+          />
+        }
+      />
+    </SidebarMenuItem>
   )
 }
 
