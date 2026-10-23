@@ -59,7 +59,7 @@ export function AssigneeCell({
       >
         {email ? (
           <>
-            <PersonAvatar email={email} className="size-5" />
+            <PersonAvatar email={email} size="xs" />
             <span className="truncate">{email}</span>
           </>
         ) : (
@@ -78,7 +78,7 @@ export function AssigneeCell({
           </DropdownMenuRadioItem>
           {people.map((person) => (
             <DropdownMenuRadioItem key={person.userId} value={person.userId} closeOnClick>
-              <PersonAvatar email={person.email} className="size-5" />
+              <PersonAvatar email={person.email} size="xs" />
               <span className="truncate">{person.email}</span>
               {person.isYou ? <span className="text-muted-foreground">(you)</span> : null}
             </DropdownMenuRadioItem>

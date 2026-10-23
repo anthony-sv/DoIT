@@ -87,8 +87,8 @@ export function StoryNote({
           </span>
         ) : null}
         {assignee ? (
-          // The sm avatar is 24px through a data-size rule; the footer row is 20.
-          <PersonAvatar email={assignee} className="ml-auto data-[size=sm]:size-5" />
+          // The footer row is 20px.
+          <PersonAvatar email={assignee} size="xs" className="ml-auto" />
         ) : null}
       </div>
     </div>

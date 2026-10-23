@@ -35,7 +35,7 @@ export function AssigneeSelect({ card, people }: { card: Card; people: BoardPers
               <span className="text-muted-foreground">Unassigned</span>
             ) : (
               <>
-                <PersonAvatar email={assigneeEmail(people, value)} className="size-5" />
+                <PersonAvatar email={assigneeEmail(people, value)} size="xs" />
                 {assigneeEmail(people, value)}
               </>
             )
@@ -47,7 +47,7 @@ export function AssigneeSelect({ card, people }: { card: Card; people: BoardPers
           <SelectItem value={NONE}>Unassigned</SelectItem>
           {people.map((person) => (
             <SelectItem key={person.userId} value={person.userId}>
-              <PersonAvatar email={person.email} className="size-5" />
+              <PersonAvatar email={person.email} size="xs" />
               {person.email}
               {person.isYou ? <span className="text-muted-foreground">(you)</span> : null}
             </SelectItem>
@@ -100,7 +100,16 @@ function estimateText(estimate: number | null) {
 }
 
 /** Days of work, saved on blur or Enter; Escape puts back the saved value. */
-export function EstimateInput({ card, className }: { card: Card; className?: string }) {
+export function EstimateInput({
+  card,
+  label = 'Estimate in days',
+  className,
+}: {
+  card: Card
+  /** The input's accessible name; a table names the card in it. */
+  label?: string
+  className?: string
+}) {
   const [text, setText] = useState(estimateText(card.estimate))
   // Follow edits that arrive from elsewhere (another view, a teammate).
   const [seen, setSeen] = useState(card.estimate)
@@ -128,7 +137,7 @@ export function EstimateInput({ card, className }: { card: Card; className?: str
     <InputGroup className={cn('w-28', className)}>
       <InputGroupInput
         inputMode="decimal"
-        aria-label="Estimate in days"
+        aria-label={label}
         aria-invalid={invalid || undefined}
         placeholder="–"
         value={text}

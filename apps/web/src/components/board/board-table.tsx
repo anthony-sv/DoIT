@@ -272,19 +272,26 @@ function CardRow({
         <DueCell card={card} cardKey={key} done={column.is_done} />
       </TableCell>
       <TableCell className="p-1">
-        {/* The group names the card; the input's own label says "Estimate in days". */}
-        <div role="group" aria-label={`Estimate of ${key}`}>
-          {/* Borderless until hovered or focused, like the other cells. */}
-          <EstimateInput card={card} className="w-full border-transparent hover:border-input" />
-        </div>
+        {/* Borderless until hovered or focused, like the other cells. */}
+        <EstimateInput
+          card={card}
+          label={`Estimate of ${key} in days`}
+          className="w-full border-transparent hover:border-input"
+        />
       </TableCell>
       <TableCell className="p-1">
         <StoryCell card={card} cardKey={key} stories={stories} />
       </TableCell>
-      <TableCell className="px-3.5 py-1">
-        <div role="group" aria-label={`Labels of ${key}`}>
-          <LabelPicker card={card} boardId={board.id} labels={labels} />
-        </div>
+      {/* Chips line up with the text of the other cells' buttons; with no
+          labels the cell is a ghost button, like the others. */}
+      <TableCell className={cn('py-1', card.label_ids.length > 0 ? 'px-3.5' : 'px-1')}>
+        <LabelPicker
+          card={card}
+          boardId={board.id}
+          labels={labels}
+          label={`Labels of ${key}`}
+          flat
+        />
       </TableCell>
     </TableRow>
   )

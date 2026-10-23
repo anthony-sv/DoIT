@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
 
 /**
  * Someone on a board, as the first two letters of their email. `label` names
@@ -13,13 +14,15 @@ export function PersonAvatar({
 }: {
   email: string
   label?: string
-  size?: 'sm' | 'default'
+  /** xs (20px) fits a small select, a table cell or a sticky note's footer. */
+  size?: 'xs' | 'sm' | 'default'
   className?: string
 }) {
   return (
     <Avatar
-      size={size}
-      className={className}
+      size={size === 'xs' ? 'sm' : size}
+      // The sm size comes from a data-size rule, which a plain size-5 loses to.
+      className={cn(size === 'xs' && 'data-[size=sm]:size-5', className)}
       title={label ?? email}
       {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
     >

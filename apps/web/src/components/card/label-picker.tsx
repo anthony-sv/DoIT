@@ -26,10 +26,16 @@ export function LabelPicker({
   card,
   boardId,
   labels,
+  label = 'Edit labels',
+  flat,
 }: {
   card: Card
   boardId: string
   labels: Label[]
+  /** The trigger's accessible name; a table names the card in it. */
+  label?: string
+  /** A ghost trigger, "—" while there are no labels: a table cell, not a form. */
+  flat?: boolean
 }) {
   const [query, setQuery] = useState('')
   const selected = new Set(card.label_ids)
@@ -74,19 +80,34 @@ export function LabelPicker({
           </Badge>
         ))}
       <Popover>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="outline"
-              size={selected.size > 0 ? 'icon-xs' : 'sm'}
-              aria-label="Edit labels"
-              className={cn(selected.size > 0 && 'rounded-full border-dashed')}
-            />
-          }
-        >
-          <PlusIcon data-icon={selected.size > 0 ? undefined : 'inline-start'} />
-          {selected.size > 0 ? null : 'Add label'}
-        </PopoverTrigger>
+        {flat && selected.size === 0 ? (
+          <PopoverTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={label}
+                className="w-full justify-start text-muted-foreground"
+              />
+            }
+          >
+            —
+          </PopoverTrigger>
+        ) : (
+          <PopoverTrigger
+            render={
+              <Button
+                variant={flat ? 'ghost' : 'outline'}
+                size={selected.size > 0 ? 'icon-xs' : 'sm'}
+                aria-label={label}
+                className={cn(selected.size > 0 && 'rounded-full border-dashed')}
+              />
+            }
+          >
+            <PlusIcon data-icon={selected.size > 0 ? undefined : 'inline-start'} />
+            {selected.size > 0 ? null : 'Add label'}
+          </PopoverTrigger>
+        )}
         <PopoverContent className="w-64 p-0" align="start">
           <Command>
             <CommandInput
