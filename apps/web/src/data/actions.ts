@@ -203,10 +203,33 @@ export async function inviteMember(board: Board, email: string) {
   await Promise.all([boardMembersCollection.utils.refetch(), profilesCollection.utils.refetch()])
 }
 
-/** The owner takes someone off a board. */
+/**
+ * The owner takes someone off a board. A trigger unassigns them from its
+ * cards (migration 0009); locally the cards lose them at once.
+ */
 export function removeMember(member: BoardMember) {
-  return boardMembersCollection.delete(member.id)
+  return removeMemberAction(member)
 }
+
+const removeMemberAction = createOptimisticAction<BoardMember>({
+  onMutate: (member) => {
+    const cardIds = cardsCollection.toArray
+      .filter((c) => c.board_id === member.board_id && c.assignee_id === member.user_id)
+      .map((c) => c.id)
+    if (cardIds.length > 0) {
+      cardsCollection.update(cardIds, (drafts) => {
+        for (const d of drafts) d.assignee_id = null
+      })
+    }
+    deleteWhere(boardMembersCollection, (m) => m.id === member.id)
+  },
+  mutationFn: async (member) => {
+    await check(supabase.from('board_members').delete().eq('id', member.id))
+    await Promise.all(
+      [boardMembersCollection, cardsCollection, profilesCollection].map((c) => c.utils.refetch()),
+    )
+  },
+})
 
 /** A member takes themselves off someone else's board; it leaves at once. */
 export function leaveSharedBoard(board: Board) {

@@ -157,10 +157,6 @@ export function StoryBoard({
     )
   }
 
-  const noStoryCount = columns.reduce(
-    (sum, column) => sum + (cells[cellId(NO_STORY, column.id)]?.length ?? 0),
-    0,
-  )
   const lane = (key: string, story: Story | null) => (
     <Lane
       key={key}
@@ -223,7 +219,8 @@ export function StoryBoard({
               ))}
             </div>
             {stories.map((story) => lane(story.id, story))}
-            {noStoryCount > 0 || stories.length === 0 ? lane(NO_STORY, null) : null}
+            {/* Always there, even empty: it's where a note goes to leave its story. */}
+            {lane(NO_STORY, null)}
           </div>
         </DragDropProvider>
       </div>

@@ -63,9 +63,11 @@ they win over memory and over other projects' code:
   numbers, and strip deleted labels off cards. Sharing goes through the
   `invite_board_member()` RPC; `profiles` mirrors auth.users emails for
   people who share a board. `0009` adds: a card's story must be on its
-  board and its assignee must be the owner or a member; leaving a board
-  unassigns you from its cards; a todo can only link (`card_id`) to a card
-  its owner can open. `src/db/policies.test.ts` runs every migration
+  board and its assignee must be the owner or a member; columns, sprints,
+  labels and stories never move to another board; a card update re-checks
+  only the references it changes (so cascades and the unassign trigger
+  can't fail on an untouched one); leaving a board unassigns you from its
+  cards; a todo can only link (`card_id`) to a card its owner can open. `src/db/policies.test.ts` runs every migration
   in PGlite and checks all of this as different users: extend it with any
   policy or trigger change.
 - **Live updates**: `src/data/realtime.ts` subscribes to Supabase Realtime

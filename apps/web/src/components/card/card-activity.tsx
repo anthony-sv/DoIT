@@ -112,8 +112,21 @@ export function CardActivity({ card }: { card: Card }) {
             ) : (
               <span className="text-muted-foreground">
                 {author(event.created_by) ? `${author(event.created_by)} · ` : ''}
-                {event.kind === 'moved' ? 'Moved ' : ''}
-                <span className="font-medium text-foreground">{event.body}</span> ·{' '}
+                {event.kind === 'assigned' ? (
+                  event.body ? (
+                    <>
+                      Assigned to <span className="font-medium text-foreground">{event.body}</span>
+                    </>
+                  ) : (
+                    'Unassigned'
+                  )
+                ) : (
+                  <>
+                    {event.kind === 'moved' ? 'Moved ' : ''}
+                    <span className="font-medium text-foreground">{event.body}</span>
+                  </>
+                )}{' '}
+                ·{' '}
                 {ago(event.created_at)}
               </span>
             )}

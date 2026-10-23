@@ -28,7 +28,7 @@ export function AssigneeSelect({ card, people }: { card: Card; people: BoardPers
       value={card.assignee_id ?? NONE}
       onValueChange={(value) => setAssignee(card, people, !value || value === NONE ? null : value)}
     >
-      <SelectTrigger size="sm" aria-label="Assignee">
+      <SelectTrigger size="sm" aria-label="Assignee" className="max-w-full">
         <SelectValue>
           {(value: string) =>
             value === NONE ? (
@@ -36,7 +36,7 @@ export function AssigneeSelect({ card, people }: { card: Card; people: BoardPers
             ) : (
               <>
                 <PersonAvatar email={assigneeEmail(people, value)} size="xs" />
-                {assigneeEmail(people, value)}
+                <span className="truncate">{assigneeEmail(people, value)}</span>
               </>
             )
           }
@@ -134,7 +134,7 @@ export function EstimateInput({
   }
 
   return (
-    <InputGroup className={cn('w-28', className)}>
+    <InputGroup className={cn('w-28 max-w-full', className)}>
       <InputGroupInput
         inputMode="decimal"
         aria-label={label}

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { PlusIcon } from 'lucide-react'
 import { reportFailure } from '@/components/card/card-writes'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,14 @@ export function AddTask({
 }) {
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  // Closing hands focus to the button that replaces the form, rather than
+  // dropping it to the page with the textarea.
+  function close() {
+    flushSync(() => setAdding(false))
+    buttonRef.current?.focus()
+  }
 
   function submit() {
     const trimmed = title.trim()
@@ -50,6 +59,7 @@ export function AddTask({
   if (!adding || !column) {
     return (
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
         className="justify-start text-muted-foreground"
@@ -83,14 +93,14 @@ export function AddTask({
             e.preventDefault()
             submit()
           }
-          if (e.key === 'Escape') setAdding(false)
+          if (e.key === 'Escape') close()
         }}
       />
       <div className="flex gap-2">
         <Button type="submit" size="sm">
           Add task
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+        <Button type="button" size="sm" variant="ghost" onClick={close}>
           Cancel
         </Button>
       </div>

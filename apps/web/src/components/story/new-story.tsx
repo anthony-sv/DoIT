@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { PlusIcon } from 'lucide-react'
 import { reportFailure } from '@/components/card/card-writes'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ export function NewStory({
   inEmpty?: boolean
 }) {
   const [title, setTitle] = useState('')
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   function submit() {
     const trimmed = title.trim()
@@ -50,12 +52,13 @@ export function NewStory({
 
   if (!adding) {
     return inEmpty ? (
-      <Button onClick={() => onAddingChange(true)}>
+      <Button ref={buttonRef} onClick={() => onAddingChange(true)}>
         <PlusIcon data-icon="inline-start" />
         New story
       </Button>
     ) : (
       <Button
+        ref={buttonRef}
         variant="outline"
         className="h-12 w-60 border-dashed bg-transparent"
         onClick={() => onAddingChange(true)}
@@ -82,7 +85,10 @@ export function NewStory({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') onAddingChange(false)
+          if (e.key !== 'Escape') return
+          // Hand focus to the button that replaces the input.
+          flushSync(() => onAddingChange(false))
+          buttonRef.current?.focus()
         }}
         // Only closes: the first story unmounts the empty state's input, and
         // a blur fired on its way out must not add the story twice.

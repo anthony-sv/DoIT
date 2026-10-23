@@ -261,3 +261,42 @@ describe('stories, assignees and todos from cards', () => {
     expect(await as(bob, 'SELECT id FROM cards WHERE board_id = $1', [board])).toEqual([])
   })
 })
+
+describe('rows stay on their board', () => {
+  const board = '10000000-0000-4000-8000-000000000004'
+  const column = '20000000-0000-4000-8000-000000000004'
+  const story = '40000000-0000-4000-8000-000000000004'
+  const card = '30000000-0000-4000-8000-000000000004'
+
+  beforeAll(async () => {
+    await as(alice, `INSERT INTO boards (id, name, key, position) VALUES ($1, 'Kept', 'KP', 3)`, [board])
+    await as(alice, `INSERT INTO columns (id, board_id, name, position) VALUES ($1, $2, 'To do', 1)`, [column, board])
+    await as(alice, `INSERT INTO stories (id, board_id, title, position) VALUES ($1, $2, 'Story', 1)`, [story, board])
+    await as(alice, `SELECT invite_board_member($1, 'bob@example.com')`, [board])
+    await addCard(bob, card, column, board)
+    await as(bob, 'UPDATE cards SET story_id = $1, assignee_id = $2 WHERE id = $3', [story, bob, card])
+  })
+
+  it("won't let a member carry a story or column off to their own board", async () => {
+    await expect(as(bob, 'UPDATE stories SET board_id = $1 WHERE id = $2', [ids.bobBoard, story])).rejects.toThrow(
+      /another board/,
+    )
+    await expect(as(bob, 'UPDATE columns SET board_id = $1 WHERE id = $2', [ids.bobBoard, column])).rejects.toThrow(
+      /another board/,
+    )
+    // So the owner can still take them off the board, which unassigns them.
+    await as(alice, 'DELETE FROM board_members WHERE board_id = $1 AND user_id = $2', [board, bob])
+    expect(await as(alice, 'SELECT assignee_id, story_id FROM cards WHERE id = $1', [card])).toEqual([
+      { assignee_id: null, story_id: story },
+    ])
+  })
+
+  it('deletes the account of a member who made a card and took it', async () => {
+    await as(alice, `SELECT invite_board_member($1, 'bob@example.com')`, [board])
+    await as(bob, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [bob, card])
+    await db.query('DELETE FROM auth.users WHERE id = $1', [bob])
+    expect(await as(alice, 'SELECT created_by, assignee_id FROM cards WHERE id = $1', [card])).toEqual([
+      { created_by: null, assignee_id: null },
+    ])
+  })
+})
