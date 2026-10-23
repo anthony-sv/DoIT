@@ -3,10 +3,11 @@ import { useDroppable } from '@dnd-kit/react'
 import { useSortable } from '@dnd-kit/react/sortable'
 import { CollisionPriority } from '@dnd-kit/abstract'
 import { CircleCheckIcon, GripVerticalIcon } from 'lucide-react'
+import { PersonAvatar } from '@/components/person-avatar'
 import { Badge } from '@/components/ui/badge'
 import type { Board, Card, Label } from '@/data/schemas'
 import { colorClasses } from '@/lib/colors'
-import { cardKey, priorityNames } from '@/lib/format'
+import { cardKey, daysLabel, priorityNames } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 /** The backlog or a sprint: sortable card rows that cards can be dropped into. */
@@ -15,6 +16,7 @@ export function PlanList({
   ids,
   byId,
   labelsById,
+  emails,
   board,
   isDone,
   bordered,
@@ -24,6 +26,7 @@ export function PlanList({
   ids: string[]
   byId: Map<string, Card>
   labelsById: Map<string, Label>
+  emails: Map<string, string>
   board: Board
   isDone: (card: Card) => boolean
   bordered?: boolean
@@ -40,7 +43,9 @@ export function PlanList({
     <ul
       ref={ref}
       className={cn(
-        'flex min-h-16 flex-col',
+        // A container, so rows drop their labels when the list is narrow
+        // (a sprint beside the backlog) rather than squeezing the title.
+        '@container flex min-h-16 flex-col',
         bordered && 'gap-2',
         isDropTarget && 'rounded-lg bg-accent/50',
       )}
@@ -55,6 +60,9 @@ export function PlanList({
             listId={id}
             card={card}
             labels={card.label_ids.map((l) => labelsById.get(l)).filter((l) => l !== undefined)}
+            assignee={
+              card.assignee_id ? (emails.get(card.assignee_id) ?? 'Unknown account') : undefined
+            }
             board={board}
             done={isDone(card)}
             bordered={bordered}
@@ -80,6 +88,7 @@ function PlanRow({
   listId,
   card,
   labels,
+  assignee,
   board,
   done,
   bordered,
@@ -88,6 +97,7 @@ function PlanRow({
   listId: string
   card: Card
   labels: Label[]
+  assignee: string | undefined
   board: Board
   done: boolean
   bordered?: boolean
@@ -133,10 +143,16 @@ function PlanRow({
         {card.title}
       </Link>
       {labels.slice(0, 2).map((l) => (
-        <Badge key={l.id} variant="secondary" className={cn('max-sm:hidden', colorClasses[l.color].chip)}>
+        <Badge key={l.id} variant="secondary" className={cn('@max-xl:hidden', colorClasses[l.color].chip)}>
           {l.name}
         </Badge>
       ))}
+      <span className="w-12 shrink-0 text-right text-xs text-muted-foreground @max-sm:hidden">
+        {card.estimate !== null ? daysLabel(card.estimate) : null}
+      </span>
+      <span className="flex w-6 shrink-0 justify-center">
+        {assignee ? <PersonAvatar email={assignee} label={`Assigned to ${assignee}`} /> : null}
+      </span>
       {done ? (
         <span className="flex w-14 shrink-0 justify-end">
           <CircleCheckIcon className="size-4 text-label-green-foreground" aria-label="Done" />

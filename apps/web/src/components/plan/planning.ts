@@ -30,3 +30,8 @@ export function planningLists(
 export function cardsLabel(count: number) {
   return count === 1 ? '1 card' : `${count} cards`
 }
+
+/** Days estimated across `ids`; cards without an estimate count as nothing. */
+export function totalEstimate(ids: readonly string[], byId: ReadonlyMap<string, Pick<Card, 'estimate'>>) {
+  return ids.reduce((sum, id) => sum + (byId.get(id)?.estimate ?? 0), 0)
+}

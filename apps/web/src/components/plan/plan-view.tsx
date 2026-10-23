@@ -20,14 +20,15 @@ import {
 } from '@/data/collections'
 import { nextSprint } from '@/data/actions'
 import type { Board, Card, Label, Sprint } from '@/data/schemas'
-import { daysUntil, dueInfo, sprintRange } from '@/lib/format'
+import { useEmails } from '@/hooks/use-board-people'
+import { daysLabel, daysUntil, dueInfo, sprintRange } from '@/lib/format'
 import { positionBetween, withItemAt } from '@/lib/position'
 import { nextSprintName } from '@/lib/sprints'
 import { cn } from '@/lib/utils'
 import { Burndown } from './burndown'
 import { CloseSprintDialog } from './close-sprint-dialog'
 import { PlanList } from './plan-list'
-import { BACKLOG, type Lists, cardsLabel, planningLists } from './planning'
+import { BACKLOG, type Lists, cardsLabel, planningLists, totalEstimate } from './planning'
 import { SprintMenu } from './sprint-menu'
 import { SprintPanel } from './sprint-panel'
 
@@ -269,6 +270,8 @@ function PlanningLists({
   const [editing, setEditing] = useState<ReadonlySet<string>>(() => new Set())
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
+  const emails = useEmails()
+  const backlogEstimate = totalEstimate(lists[BACKLOG]!, byId)
 
   function setEditingOf(sprintId: string, on: boolean) {
     setEditing((prev) => {
@@ -339,6 +342,7 @@ function PlanningLists({
             <CardTitle>Backlog</CardTitle>
             <CardAction className="text-sm text-muted-foreground">
               {cardsLabel(lists[BACKLOG]!.length)}
+              {backlogEstimate > 0 ? ` · ${daysLabel(backlogEstimate, 'long')}` : null}
             </CardAction>
           </CardHeader>
           <CardContent className="px-0">
@@ -347,6 +351,7 @@ function PlanningLists({
               ids={lists[BACKLOG]!}
               byId={byId}
               labelsById={labelsById}
+              emails={emails}
               board={board}
               isDone={isDone}
               empty="Nothing waiting. New cards land here until you put them in a sprint."
@@ -363,6 +368,7 @@ function PlanningLists({
                 sprint={sprint}
                 running={running}
                 cardCount={ids.length}
+                estimate={totalEstimate(ids, byId)}
                 editing={editing.has(sprint.id)}
                 onEditingChange={(on) => setEditingOf(sprint.id, on)}
               >
@@ -371,6 +377,7 @@ function PlanningLists({
                   ids={ids}
                   byId={byId}
                   labelsById={labelsById}
+                  emails={emails}
                   board={board}
                   isDone={isDone}
                   bordered

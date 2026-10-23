@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Card } from '@/data/schemas'
-import { BACKLOG, cardsLabel, planningLists } from './planning'
+import { BACKLOG, cardsLabel, planningLists, totalEstimate } from './planning'
 
 const card = (id: string, sprint_id: string | null, done = false) =>
   ({ id, sprint_id, column_id: done ? 'done' : 'todo' }) as Card
@@ -41,5 +41,17 @@ describe('cardsLabel', () => {
     expect(cardsLabel(1)).toBe('1 card')
     expect(cardsLabel(0)).toBe('0 cards')
     expect(cardsLabel(12)).toBe('12 cards')
+  })
+})
+
+describe('totalEstimate', () => {
+  it('adds the estimates, counting unestimated and missing cards as nothing', () => {
+    const byId = new Map([
+      ['a', { estimate: 0.5 }],
+      ['b', { estimate: null }],
+      ['c', { estimate: 3 }],
+    ])
+    expect(totalEstimate(['a', 'b', 'c', 'gone'], byId)).toBe(3.5)
+    expect(totalEstimate([], byId)).toBe(0)
   })
 })

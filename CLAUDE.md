@@ -62,7 +62,10 @@ they win over memory and over other projects' code:
   writer, keep archiving/position/deleting for the owner, assign card
   numbers, and strip deleted labels off cards. Sharing goes through the
   `invite_board_member()` RPC; `profiles` mirrors auth.users emails for
-  people who share a board. `src/db/policies.test.ts` runs every migration
+  people who share a board. `0009` adds: a card's story must be on its
+  board and its assignee must be the owner or a member; leaving a board
+  unassigns you from its cards; a todo can only link (`card_id`) to a card
+  its owner can open. `src/db/policies.test.ts` runs every migration
   in PGlite and checks all of this as different users: extend it with any
   policy or trigger change.
 - **Live updates**: `src/data/realtime.ts` subscribes to Supabase Realtime
@@ -72,6 +75,11 @@ they win over memory and over other projects' code:
 - **Ordering** uses fractional positions (`src/lib/position.ts`): a drop
   writes one row. Cards have `position` (in a board column) and
   `backlog_position` (backlog and sprint lists).
+- **Board views**: the board page's `view` search param picks Board, Table
+  or Stories; all three take `BoardViewProps` (`components/board/view-props.ts`)
+  from the page, which applies the sprint and text filters once. Card fields
+  are edited through `components/card/card-fields.tsx` and written through
+  `card-writes.ts`, so every view writes a card the same way.
 - **Drag and drop**: `@dnd-kit/react`. Lists render a local copy while
   dragging and write the result on drop. Space picks up with the keyboard;
   Enter opens a card.

@@ -4,6 +4,12 @@ Kanban boards with custom columns, drag and drop, sprints with a burndown,
 boards shared with teammates (live updates), a personal todo list in sections, and drawings: whiteboards (Excalidraw) and
 diagrams (draw.io). React 19 · TanStack Start · TanStack DB · Supabase.
 
+Each board has three views: **Board** (columns of cards), **Table** (a grid
+grouped by status, edited in place) and **Stories** (user stories down the
+side, the board's columns across, each card a sticky note sized by its
+estimate). Cards can be assigned to anyone on the board, tinted with a color
+and estimated in days.
+
 ## Set up
 
 1. Create a Supabase project for DoIT.
@@ -45,7 +51,12 @@ Google works the same way with `VITE_AUTH_PROVIDERS=github,google`.
 Choose **Share** on a board and add someone by email. They need to have
 signed in to DoIT once. Everyone on a board can see and change everything on
 it; only its owner can share it, archive it or delete it, and members can
-leave. Todos and drawings are never shared. Changes show up for everyone
+leave. Todos and drawings are never shared.
+
+A card can be assigned to the board's owner or any member. Whoever leaves a
+board, or is removed from it, is unassigned from its cards. On **My todos**,
+**Import assigned cards** copies your open cards from every board into your
+todos (the inbox or a section); each todo links back to its card. Changes show up for everyone
 within a second (Supabase Realtime; migration `0007` adds the board tables to
 its publication).
 
