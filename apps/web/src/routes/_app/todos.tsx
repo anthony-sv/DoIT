@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { eq, useLiveQuery } from '@tanstack/react-db'
 import { CircleCheckIcon } from 'lucide-react'
+import { ImportCardsDialog } from '@/components/todos/import-cards-dialog'
+import { type CardLink, CardLinks } from '@/components/todos/todo-row'
 import { AddSection, TodoSections } from '@/components/todos/todo-sections'
 import {
   Empty,
@@ -13,8 +15,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { toast } from '@/components/ui/toast'
-import { todoSectionsCollection, todosCollection } from '@/data/collections'
+import {
+  boardsCollection,
+  cardsCollection,
+  todoSectionsCollection,
+  todosCollection,
+} from '@/data/collections'
 import { currentUserId } from '@/lib/auth'
+import { cardKey } from '@/lib/format'
 import { positionBetween } from '@/lib/position'
 
 export const Route = createFileRoute('/_app/todos')({
@@ -46,6 +54,32 @@ function TodosPage() {
         .where(({ todo }) => eq(todo.done, true))
         .orderBy(({ todo }) => todo.position, 'desc'),
   })
+  // The cards imported todos came from, for the rows' links: one query for
+  // the page, not one per row. The inner joins leave out a card that is gone
+  // or that you can no longer see, so its todo shows no link.
+  const { data: linked } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ todo: todosCollection })
+        .innerJoin({ card: cardsCollection }, ({ todo, card }) => eq(todo.card_id, card.id))
+        .innerJoin({ board: boardsCollection }, ({ card, board }) => eq(card.board_id, board.id))
+        .select(({ card, board }) => ({
+          cardId: card.id,
+          boardId: board.id,
+          boardKey: board.key,
+          number: card.number,
+        })),
+  })
+  const cardLinks = useMemo(
+    () =>
+      new Map<string, CardLink>(
+        linked.map((l) => [
+          l.cardId,
+          { cardId: l.cardId, boardId: l.boardId, key: cardKey(l.boardKey, l.number) },
+        ]),
+      ),
+    [linked],
+  )
 
   function add() {
     const trimmed = text.trim()
@@ -79,7 +113,10 @@ function TodosPage() {
           <SidebarTrigger className="-ml-1.5 md:hidden" />
           Personal
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">My todos</h1>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">My todos</h1>
+          <ImportCardsDialog sections={sections} />
+        </div>
         <p className="text-sm text-muted-foreground">
           Small things that don’t need a card, grouped however you like.
         </p>
@@ -112,7 +149,9 @@ function TodosPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <TodoSections sections={sections} open={open} done={done} />
+        <CardLinks value={cardLinks}>
+          <TodoSections sections={sections} open={open} done={done} />
+        </CardLinks>
       )}
 
       <AddSection sections={sections} />
