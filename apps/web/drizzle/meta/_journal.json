@@ -57,6 +57,20 @@
       "when": 1792565241522,
       "tag": "0007_sharing_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792715935154,
+      "tag": "0008_stories_assignees",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792715974423,
+      "tag": "0009_stories_assignees_triggers",
+      "breakpoints": true
     }
   ]
 }

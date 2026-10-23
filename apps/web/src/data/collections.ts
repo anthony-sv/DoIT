@@ -17,6 +17,7 @@ import {
   type Label,
   type Profile,
   type Sprint,
+  type Story,
   type Todo,
   type TodoSection,
   boardMemberSchema,
@@ -29,6 +30,7 @@ import {
   labelSchema,
   profileSchema,
   sprintSchema,
+  storySchema,
   todoSchema,
   todoSectionSchema,
 } from './schemas'
@@ -156,6 +158,9 @@ export const sprintsCollection = createCollection(
 export const labelsCollection = createCollection(
   queryCollectionOptions({ ...supabaseTable<Label>('labels'), schema: labelSchema }),
 )
+export const storiesCollection = createCollection(
+  queryCollectionOptions({ ...supabaseTable<Story>('stories'), schema: storySchema }),
+)
 export const cardsCollection = createCollection(
   queryCollectionOptions({ ...supabaseTable<Card>('cards'), schema: cardSchema }),
 )
@@ -193,6 +198,7 @@ const allCollections = [
   columnsCollection,
   sprintsCollection,
   labelsCollection,
+  storiesCollection,
   cardsCollection,
   checklistItemsCollection,
   cardEventsCollection,

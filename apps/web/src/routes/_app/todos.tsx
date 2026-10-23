@@ -61,6 +61,7 @@ function TodosPage() {
         id: crypto.randomUUID(),
         owner_id: currentUserId(),
         section_id: null,
+        card_id: null,
         text: trimmed,
         done: false,
         due_on: null,

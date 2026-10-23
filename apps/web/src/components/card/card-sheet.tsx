@@ -28,9 +28,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from '@/components/ui/toast'
 import { cardsCollection } from '@/data/collections'
-import { moveCard } from '@/data/actions'
 import {
   type Board,
   type Card,
@@ -38,29 +36,25 @@ import {
   type Label,
   type Priority,
   type Sprint,
+  type Story,
   priorities,
 } from '@/data/schemas'
-import { positionAfterLast } from '@/lib/position'
+import { useBoardPeople } from '@/hooks/use-board-people'
 import { supabase } from '@/lib/supabase'
 import { cardKey, dueInfo, priorityNames, sprintRange } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CardActivity } from './card-activity'
 import { CardChecklist } from './card-checklist'
+import { AssigneeSelect, CardColorPicker, EstimateInput, StorySelect } from './card-fields'
+import { moveToColumn, reportFailure, updateCard } from './card-writes'
 import { LabelPicker } from './label-picker'
-
-function reportFailure(what: string) {
-  return (error: Error) => toast.add({ title: what, description: error.message, type: 'error' })
-}
-
-function updateCard(id: string, what: string, change: (draft: Card) => void) {
-  cardsCollection.update(id, change).isPersisted.promise.catch(reportFailure(what))
-}
 
 export function CardSheet({
   card,
   board,
   columns,
   sprints,
+  stories,
   labels,
   onClose,
 }: {
@@ -68,6 +62,7 @@ export function CardSheet({
   board: Board
   columns: Column[]
   sprints: Sprint[]
+  stories: Story[]
   labels: Label[]
   onClose: () => void
 }) {
@@ -89,6 +84,7 @@ export function CardSheet({
             board={board}
             columns={columns}
             sprints={sprints}
+            stories={stories}
             labels={labels}
             closeRef={closeRef}
             onClose={onClose}
@@ -104,6 +100,7 @@ function CardDetail({
   board,
   columns,
   sprints,
+  stories,
   labels,
   closeRef,
   onClose,
@@ -112,12 +109,14 @@ function CardDetail({
   board: Board
   columns: Column[]
   sprints: Sprint[]
+  stories: Story[]
   labels: Label[]
   closeRef: RefObject<HTMLButtonElement | null>
   onClose: () => void
 }) {
   const column = columns.find((c) => c.id === card.column_id)
   const key = cardKey(board.key, card.number)
+  const people = useBoardPeople(board)
 
   return (
     <>
@@ -148,17 +147,7 @@ function CardDetail({
           <dd>
             <Select
               value={card.column_id}
-              onValueChange={(id) => {
-                const to = columns.find((c) => c.id === id)
-                if (!to || !column || to.id === column.id) return
-                const siblings = cardsCollection.toArray
-                  .filter((c) => c.column_id === to.id)
-                  .map((c) => c.position)
-                  .sort((a, b) => a - b)
-                moveCard(card, column, to, positionAfterLast(siblings)).isPersisted.promise.catch(
-                  reportFailure('Move not saved'),
-                )
-              }}
+              onValueChange={(id) => id && moveToColumn(card, columns, id)}
             >
               <SelectTrigger size="sm" aria-label="Status">
                 <SelectValue>{() => column?.name}</SelectValue>
@@ -175,9 +164,19 @@ function CardDetail({
             </Select>
           </dd>
 
+          <dt className="text-muted-foreground">Assignee</dt>
+          <dd>
+            <AssigneeSelect card={card} people={people} />
+          </dd>
+
           <dt className="text-muted-foreground">Sprint</dt>
           <dd>
             <SprintSelect card={card} sprints={sprints} />
+          </dd>
+
+          <dt className="text-muted-foreground">Story</dt>
+          <dd>
+            <StorySelect card={card} stories={stories} />
           </dd>
 
           <dt className="text-muted-foreground">Priority</dt>
@@ -206,6 +205,11 @@ function CardDetail({
             </Select>
           </dd>
 
+          <dt className="text-muted-foreground">Estimate</dt>
+          <dd>
+            <EstimateInput card={card} />
+          </dd>
+
           <dt className="text-muted-foreground">Due</dt>
           <dd>
             <DueDatePicker card={card} done={column?.is_done ?? false} />
@@ -214,6 +218,11 @@ function CardDetail({
           <dt className="text-muted-foreground">Labels</dt>
           <dd>
             <LabelPicker card={card} boardId={board.id} labels={labels} />
+          </dd>
+
+          <dt className="text-muted-foreground">Color</dt>
+          <dd>
+            <CardColorPicker card={card} />
           </dd>
         </dl>
 

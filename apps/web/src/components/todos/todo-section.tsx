@@ -264,6 +264,7 @@ function AddTodo({ sectionId, name }: { sectionId: string | null; name: string }
         id: crypto.randomUUID(),
         owner_id: currentUserId(),
         section_id: sectionId,
+        card_id: null,
         text: trimmed,
         done: false,
         due_on: null,

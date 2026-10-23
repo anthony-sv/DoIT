@@ -14,6 +14,7 @@ import {
   labelsCollection,
   profilesCollection,
   sprintsCollection,
+  storiesCollection,
 } from './collections'
 import { supabase } from '@/lib/supabase'
 
@@ -24,6 +25,7 @@ const boardTables = {
   columns: [columnsCollection],
   sprints: [sprintsCollection],
   labels: [labelsCollection],
+  stories: [storiesCollection],
   cards: [cardsCollection],
   checklist_items: [checklistItemsCollection],
   card_events: [cardEventsCollection],

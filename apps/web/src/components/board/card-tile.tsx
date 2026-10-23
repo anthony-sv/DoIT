@@ -1,9 +1,10 @@
 import type { Ref } from 'react'
-import { CalendarIcon, CircleCheckIcon, ListChecksIcon } from 'lucide-react'
+import { CalendarIcon, CircleCheckIcon, ListChecksIcon, TimerIcon } from 'lucide-react'
+import { PersonAvatar } from '@/components/person-avatar'
 import { Badge } from '@/components/ui/badge'
 import type { Card, Label } from '@/data/schemas'
 import { colorClasses } from '@/lib/colors'
-import { cardKey, dueInfo, priorityNames } from '@/lib/format'
+import { cardKey, daysLabel, dueInfo, priorityNames } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 export function CardTile({
@@ -12,6 +13,7 @@ export function CardTile({
   done,
   boardKey,
   labels,
+  assignee,
   progress,
   dragging,
   onOpen,
@@ -21,33 +23,36 @@ export function CardTile({
   done: boolean
   boardKey: string
   labels: Label[]
+  /** The assignee's email; undefined when no one is on it. */
+  assignee: string | undefined
   progress: { done: number; total: number } | undefined
   dragging?: boolean
   onOpen: () => void
 }) {
   const due = card.due_on ? dueInfo(card.due_on, done) : null
   const urgent = card.priority === 'high' || card.priority === 'urgent'
+  const checklist = progress && progress.total > 0 ? progress : null
+  const key = cardKey(boardKey, card.number)
 
   return (
     <div
       ref={ref}
       role="button"
       tabIndex={0}
-      aria-label={`${cardKey(boardKey, card.number)} ${card.title}`}
+      aria-label={`${key} ${card.title}${assignee ? `, assigned to ${assignee}` : ''}`}
       onClick={onOpen}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen()
       }}
       className={cn(
-        'flex cursor-pointer flex-col gap-2.5 rounded-[10px] border bg-card p-3 text-left text-card-foreground shadow-xs outline-none transition-shadow',
+        'flex cursor-pointer flex-col gap-2.5 rounded-[10px] border p-3 text-left text-card-foreground shadow-xs outline-none transition-shadow',
+        card.color ? colorClasses[card.color].card : 'bg-card',
         'hover:border-foreground/20 focus-visible:ring-2 focus-visible:ring-ring',
         dragging && 'rotate-2 border-primary shadow-lg',
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs text-muted-foreground">
-          {cardKey(boardKey, card.number)}
-        </span>
+        <span className="font-mono text-xs text-muted-foreground">{key}</span>
         {done ? (
           <CircleCheckIcon className="size-4 text-label-green-foreground" aria-label="Done" />
         ) : (
@@ -76,17 +81,22 @@ export function CardTile({
         </div>
       ) : null}
 
-      {progress && progress.total > 0 ? (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <ListChecksIcon className="size-3.5" />
-            {progress.done}/{progress.total}
-          </span>
+      {checklist || due || card.estimate !== null || assignee ? (
+        <div className="flex min-h-6 items-center gap-3 text-xs text-muted-foreground">
+          {checklist ? (
+            <span className="flex items-center gap-1">
+              <ListChecksIcon className="size-3.5" />
+              {checklist.done}/{checklist.total}
+            </span>
+          ) : null}
           <DueChip due={due} />
-        </div>
-      ) : due ? (
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <DueChip due={due} />
+          {card.estimate !== null ? (
+            <span className="flex items-center gap-1" title="Estimate">
+              <TimerIcon className="size-3.5" />
+              {daysLabel(card.estimate)}
+            </span>
+          ) : null}
+          {assignee ? <PersonAvatar email={assignee} className="ml-auto" /> : null}
         </div>
       ) : null}
     </div>

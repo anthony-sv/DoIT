@@ -94,18 +94,37 @@ export const labelSchema = z.object({
 })
 export type Label = z.infer<typeof labelSchema>
 
+// A user story; its cards are its tasks.
+export const storySchema = z.object({
+  id,
+  owner_id: id,
+  board_id: id,
+  title: z.string().trim().min(1).max(200),
+  description: z.string().max(5_000),
+  position: z.number(),
+  created_at: timestamp,
+})
+export type Story = z.infer<typeof storySchema>
+
 export const cardSchema = z.object({
   id,
   owner_id: id,
   board_id: id,
   column_id: id,
   sprint_id: id.nullable(),
+  story_id: id.nullable(),
+  // The board's owner or a member; null is unassigned.
+  assignee_id: id.nullable(),
   number: z.number().int(),
   title: z.string().trim().min(1).max(200),
   description: z.string().max(20_000),
   priority: z.enum(priorities),
   due_on: day.nullable(),
   label_ids: z.array(id),
+  // Days of work.
+  estimate: z.number().min(0).max(999).nullable(),
+  // Null is a plain card.
+  color: color.nullable(),
   position: z.number(),
   backlog_position: z.number(),
   completed_at: timestamp.nullable(),
@@ -152,6 +171,8 @@ export const todoSchema = z.object({
   owner_id: id,
   // Null is the inbox.
   section_id: id.nullable(),
+  // The card it was imported from, if any.
+  card_id: id.nullable(),
   text: z.string().trim().min(1).max(300),
   done: z.boolean(),
   due_on: day.nullable(),

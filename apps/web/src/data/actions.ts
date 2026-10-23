@@ -17,6 +17,7 @@ import {
   labelsCollection,
   profilesCollection,
   sprintsCollection,
+  storiesCollection,
   todoSectionsCollection,
   todosCollection,
 } from './collections'
@@ -28,6 +29,8 @@ import type {
   Label,
   LabelColor,
   Sprint,
+  Story,
+  Todo,
   TodoSection,
 } from './schemas'
 
@@ -161,6 +164,7 @@ function dropBoardLocally(boardId: string) {
   deleteWhere(checklistItemsCollection, (i) => cardIds.has(i.card_id))
   deleteWhere(cardsCollection, (c) => cardIds.has(c.id))
   deleteWhere(labelsCollection, (l) => l.board_id === boardId)
+  deleteWhere(storiesCollection, (s) => s.board_id === boardId)
   deleteWhere(sprintsCollection, (s) => s.board_id === boardId)
   deleteWhere(columnsCollection, (c) => c.board_id === boardId)
   deleteWhere(boardMembersCollection, (m) => m.board_id === boardId)
@@ -173,6 +177,7 @@ const boardCollections = [
   columnsCollection,
   sprintsCollection,
   labelsCollection,
+  storiesCollection,
   cardsCollection,
   checklistItemsCollection,
   cardEventsCollection,
@@ -249,6 +254,7 @@ export function addCard(input: {
   column: Column
   title: string
   sprintId: string | null
+  storyId?: string | null
   position: number
   backlogPosition: number
 }) {
@@ -258,12 +264,16 @@ export function addCard(input: {
     board_id: input.board.id,
     column_id: input.column.id,
     sprint_id: input.sprintId,
+    story_id: input.storyId ?? null,
+    assignee_id: null,
     number: 0,
     title: input.title.trim(),
     description: '',
     priority: 'medium',
     due_on: null,
     label_ids: [],
+    estimate: null,
+    color: null,
     position: input.position,
     backlog_position: input.backlogPosition,
     completed_at: input.column.is_done ? now() : null,
@@ -286,9 +296,19 @@ export function logEvent(cardId: string, kind: string, body: string) {
   })
 }
 
-/** Move a card on the board: new column and/or new place inside it. */
-export function moveCard(card: Card, from: Column, to: Column, position: number) {
+/**
+ * Move a card on the board: new column and/or new place inside it. `change`
+ * edits the card in the same write (the story board moves it between stories).
+ */
+export function moveCard(
+  card: Card,
+  from: Column,
+  to: Column,
+  position: number,
+  change?: (draft: Card) => void,
+) {
   const tx = cardsCollection.update(card.id, (draft) => {
+    change?.(draft)
     draft.column_id = to.id
     draft.position = position
     if (to.is_done && !draft.completed_at) draft.completed_at = now()
@@ -302,6 +322,20 @@ export function moveCard(card: Card, from: Column, to: Column, position: number)
         toast.add({ title: 'Activity not saved', description: error.message, type: 'error' }),
     )
   }
+  return tx
+}
+
+/**
+ * Give a card to someone on its board (null: no one), noted in its activity
+ * by their email, as it reads today.
+ */
+export function assignCard(card: Card, assignee: { userId: string; email: string } | null) {
+  const tx = cardsCollection.update(card.id, (draft) => {
+    draft.assignee_id = assignee?.userId ?? null
+  })
+  logEvent(card.id, 'assigned', assignee?.email ?? '').isPersisted.promise.catch((error: Error) =>
+    toast.add({ title: 'Activity not saved', description: error.message, type: 'error' }),
+  )
   return tx
 }
 
@@ -466,7 +500,63 @@ const deleteSprint = createOptimisticAction<string>({
   },
 })
 
+// ── Stories ──────────────────────────────────────────────────────────────
+
+/**
+ * Delete a story. Its cards stay on the board in no story: Postgres sets
+ * cards.story_id to null, and so do we.
+ */
+export function removeStory(story: Story) {
+  return deleteStory(story.id)
+}
+
+const deleteStory = createOptimisticAction<string>({
+  onMutate: (storyId) => {
+    const cardIds = cardsCollection.toArray
+      .filter((c) => c.story_id === storyId)
+      .map((c) => c.id)
+    if (cardIds.length > 0) {
+      cardsCollection.update(cardIds, (drafts) => {
+        for (const d of drafts) d.story_id = null
+      })
+    }
+    deleteWhere(storiesCollection, (s) => s.id === storyId)
+  },
+  mutationFn: async (storyId) => {
+    await check(supabase.from('stories').delete().eq('id', storyId))
+    await Promise.all([cardsCollection.utils.refetch(), storiesCollection.utils.refetch()])
+  },
+})
+
 // ── Todos ────────────────────────────────────────────────────────────────
+
+/**
+ * Copy cards into the todo list, on top of the inbox or of `sectionId`, in
+ * the order given. Each todo reads "KEY-12 Title", keeps the card's due date
+ * and links back to the card. One insert, so they save or fail together.
+ */
+export function importCardsAsTodos(
+  cards: ReadonlyArray<{ card: Card; key: string }>,
+  sectionId: string | null,
+) {
+  const first = todosCollection.toArray
+    .filter((t) => t.section_id === sectionId)
+    .reduce((min, t) => Math.min(min, t.position), Infinity)
+  const step = 1024
+  const start = Number.isFinite(first) ? first - step * cards.length : step
+  const todos: Todo[] = cards.map(({ card, key }, i) => ({
+    id: crypto.randomUUID(),
+    owner_id: currentUserId(),
+    section_id: sectionId,
+    card_id: card.id,
+    text: `${key} ${card.title}`,
+    done: false,
+    due_on: card.due_on,
+    position: start + step * i,
+    created_at: now(),
+  }))
+  return todosCollection.insert(todos)
+}
 
 /**
  * Delete a todo section. Its todos move to the end of the inbox first, so

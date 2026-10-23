@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { eq, useLiveQuery } from '@tanstack/react-db'
-import { ArchiveIcon, InboxIcon, SearchIcon } from 'lucide-react'
+import { ArchiveIcon, InboxIcon, KanbanIcon, SearchIcon, StickyNoteIcon, TableIcon } from 'lucide-react'
 import { CardSheet } from '@/components/card/card-sheet'
+import { StoryBoard } from '@/components/story/story-board'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   boardsCollection,
   cardsCollection,
@@ -24,6 +26,7 @@ import {
   columnsCollection,
   labelsCollection,
   sprintsCollection,
+  storiesCollection,
 } from '@/data/collections'
 import type { Card, Sprint } from '@/data/schemas'
 import { currentUserId } from '@/lib/auth'
@@ -31,11 +34,11 @@ import { daysUntil, sprintRange } from '@/lib/format'
 import { BoardGone } from './board-gone'
 import { BoardColumns } from './board-columns'
 import { BoardMenu } from './board-menu'
+import { BoardTable } from './board-table'
 import { ShareBoardButton } from './share-board-dialog'
+import { type BoardViewName, type BoardViewProps, type ChecklistProgress, boardViews } from './view-props'
 
 const route = getRouteApi('/_app/b/$boardId/')
-
-export type ChecklistProgress = Map<string, { done: number; total: number }>
 
 export function BoardView({ boardId }: { boardId: string }) {
   const search = route.useSearch()
@@ -65,6 +68,13 @@ export function BoardView({ boardId }: { boardId: string }) {
   const { data: labels } = useLiveQuery({
     query: (q) =>
       q.from({ label: labelsCollection }).where(({ label }) => eq(label.board_id, boardId)),
+  })
+  const { data: stories } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ story: storiesCollection })
+        .where(({ story }) => eq(story.board_id, boardId))
+        .orderBy(({ story }) => story.position),
   })
   const { data: cards } = useLiveQuery({
     query: (q) =>
@@ -113,8 +123,20 @@ export function BoardView({ boardId }: { boardId: string }) {
   }, [checklist])
 
   const openCard = search.card ? cards.find((c) => c.id === search.card) : undefined
+  const view: BoardViewName = search.view ?? 'board'
 
   if (!board) return <BoardGone />
+
+  const viewProps: BoardViewProps = {
+    board,
+    columns,
+    cards: visibleCards,
+    labels,
+    stories,
+    progress,
+    sprintId: shownSprint?.state === 'closed' ? null : (shownSprint?.id ?? null),
+    onOpenCard: (id) => void navigate({ search: (prev) => ({ ...prev, card: id }) }),
+  }
 
   return (
     <div className="flex min-h-svh flex-col gap-5 px-4 py-5 sm:px-7">
@@ -173,21 +195,47 @@ export function BoardView({ boardId }: { boardId: string }) {
         </div>
       </header>
 
-      <BoardColumns
-        board={board}
-        columns={columns}
-        cards={visibleCards}
-        labels={labels}
-        progress={progress}
-        sprintId={shownSprint?.state === 'closed' ? null : (shownSprint?.id ?? null)}
-        onOpenCard={(id) => void navigate({ search: (prev) => ({ ...prev, card: id }) })}
-      />
+      <Tabs
+        value={view}
+        onValueChange={(value: BoardViewName) => {
+          if (!boardViews.includes(value)) return
+          void navigate({
+            search: (prev) => ({ ...prev, view: value === 'board' ? undefined : value }),
+          })
+        }}
+        className="gap-4"
+      >
+        <TabsList>
+          <TabsTrigger value="board">
+            <KanbanIcon data-icon="inline-start" />
+            Board
+          </TabsTrigger>
+          <TabsTrigger value="table">
+            <TableIcon data-icon="inline-start" />
+            Table
+          </TabsTrigger>
+          <TabsTrigger value="stories">
+            <StickyNoteIcon data-icon="inline-start" />
+            Stories
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="board">
+          <BoardColumns {...viewProps} />
+        </TabsContent>
+        <TabsContent value="table">
+          <BoardTable {...viewProps} />
+        </TabsContent>
+        <TabsContent value="stories">
+          <StoryBoard {...viewProps} />
+        </TabsContent>
+      </Tabs>
 
       <CardSheet
         card={openCard}
         board={board}
         columns={columns}
         sprints={sprints}
+        stories={stories}
         labels={labels}
         onClose={() => void navigate({ search: (prev) => ({ ...prev, card: undefined }) })}
       />

@@ -245,6 +245,24 @@ export const labels = pgTable(
   ],
 )
 
+// A user story on a board. Its cards are its tasks; a card in no story is
+// board work of its own. Deleting a story keeps its cards, in no story.
+export const stories = pgTable(
+  'stories',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ownerId: ownerId(),
+    boardId: uuid()
+      .notNull()
+      .references(() => boards.id, { onDelete: 'cascade' }),
+    title: text().notNull(),
+    description: text().notNull().default(''),
+    position: doublePrecision().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.boardId), boardMembersAll('stories', t.boardId)],
+)
+
 export const cards = pgTable(
   'cards',
   {
@@ -257,6 +275,10 @@ export const cards = pgTable(
       .notNull()
       .references(() => columns.id, { onDelete: 'cascade' }),
     sprintId: uuid().references(() => sprints.id, { onDelete: 'set null' }),
+    storyId: uuid().references(() => stories.id, { onDelete: 'set null' }),
+    // Who's on it: the board's owner or a member (a trigger checks, and
+    // unassigns people who leave the board).
+    assigneeId: uuid().references(() => authUsers.id, { onDelete: 'set null' }),
     // Assigned by a trigger from boards.next_number.
     number: integer().notNull().default(0),
     title: text().notNull(),
@@ -264,6 +286,10 @@ export const cards = pgTable(
     priority: text().notNull().default('medium'),
     dueOn: date(),
     labelIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    // Days of work. Sizes the card's sticky note on the story board.
+    estimate: doublePrecision(),
+    // A tint from the label palette; null is a plain card.
+    color: text(),
     // Order inside its column on the board, and inside the backlog list.
     position: doublePrecision().notNull(),
     backlogPosition: doublePrecision().notNull(),
@@ -276,10 +302,17 @@ export const cards = pgTable(
     index().on(t.boardId),
     index().on(t.columnId),
     index().on(t.sprintId),
+    index().on(t.storyId),
+    index().on(t.assigneeId),
     check(
       'cards_priority_check',
       sql`${t.priority} in ('low', 'medium', 'high', 'urgent')`,
     ),
+    check(
+      'cards_estimate_check',
+      sql`${t.estimate} is null or (${t.estimate} >= 0 and ${t.estimate} <= 999)`,
+    ),
+    colorCheck('cards', t.color),
     boardMembersAll('cards', t.boardId),
   ],
 )
@@ -337,6 +370,9 @@ export const todos = pgTable(
     ownerId: ownerId(),
     // No section means the inbox. Deleting a section moves its todos there.
     sectionId: uuid().references(() => todoSections.id, { onDelete: 'set null' }),
+    // The card it was imported from (My todos → Import assigned cards). Kept
+    // when the card's board is no longer yours; null once the card is deleted.
+    cardId: uuid().references(() => cards.id, { onDelete: 'set null' }),
     text: text().notNull(),
     done: boolean().notNull().default(false),
     dueOn: date(),
@@ -346,6 +382,7 @@ export const todos = pgTable(
   (t) => [
     index().on(t.ownerId),
     index().on(t.sectionId),
+    index().on(t.cardId),
     ownerOnly('todos', t.ownerId),
   ],
 )
