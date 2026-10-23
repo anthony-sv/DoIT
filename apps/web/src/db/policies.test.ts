@@ -174,3 +174,129 @@ describe('board sharing', () => {
     expect(await as(bob, 'SELECT id FROM todos')).toEqual([])
   })
 })
+
+describe('stories, assignees and todos from cards', () => {
+  const story = '40000000-0000-4000-8000-000000000001'
+  const bobStory = '40000000-0000-4000-8000-000000000002'
+
+  beforeAll(async () => {
+    await as(alice, `SELECT invite_board_member('${ids.board}', 'bob@example.com')`)
+  })
+
+  it("files a member's story under the board's owner, and keeps a card's story on its board", async () => {
+    await as(bob, `INSERT INTO stories (id, board_id, title, position) VALUES ($1, $2, 'Sign-up', 1)`, [
+      story,
+      ids.board,
+    ])
+    await as(bob, `INSERT INTO stories (id, board_id, title, position) VALUES ($1, $2, 'Mine', 1)`, [
+      bobStory,
+      ids.bobBoard,
+    ])
+    expect(await as(alice, 'SELECT id, owner_id FROM stories')).toEqual([{ id: story, owner_id: alice }])
+    expect(await as(carol, 'SELECT id FROM stories')).toEqual([])
+
+    await as(bob, 'UPDATE cards SET story_id = $1 WHERE id = $2', [story, ids.card])
+    await expect(as(bob, 'UPDATE cards SET story_id = $1 WHERE id = $2', [bobStory, ids.card])).rejects.toThrow(
+      /story does not belong/,
+    )
+  })
+
+  it('takes a color from the palette and a sane estimate', async () => {
+    await as(bob, `UPDATE cards SET color = 'amber', estimate = 2.5 WHERE id = $1`, [ids.card])
+    await expect(as(bob, `UPDATE cards SET color = 'pink' WHERE id = $1`, [ids.card])).rejects.toThrow()
+    await expect(as(bob, 'UPDATE cards SET estimate = -1 WHERE id = $1', [ids.card])).rejects.toThrow()
+  })
+
+  it('assigns cards only to people on the board, and unassigns whoever leaves', async () => {
+    await as(alice, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [bob, ids.card])
+    await expect(as(alice, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [carol, ids.card])).rejects.toThrow(
+      /not on this board/,
+    )
+    // The owner isn't a member row, but can be assigned too.
+    await as(bob, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [alice, ids.card])
+    await as(bob, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [bob, ids.card])
+
+    await as(bob, `DELETE FROM board_members WHERE user_id = '${bob}'`)
+    expect(await as(alice, 'SELECT assignee_id FROM cards WHERE id = $1', [ids.card])).toEqual([
+      { assignee_id: null },
+    ])
+  })
+
+  it('links a todo only to a card its owner can open, and keeps the link after', async () => {
+    await expect(
+      as(bob, `INSERT INTO todos (text, position, card_id) VALUES ('TM-1', 1, $1)`, [ids.card]),
+    ).rejects.toThrow(/card not found/)
+
+    await as(alice, `SELECT invite_board_member('${ids.board}', 'bob@example.com')`)
+    const [todo] = await as<{ id: string }>(
+      bob,
+      `INSERT INTO todos (text, position, card_id) VALUES ('TM-1', 1, $1) RETURNING id`,
+      [ids.card],
+    )
+    await as(alice, `DELETE FROM board_members WHERE user_id = '${bob}'`)
+    await as(bob, 'UPDATE todos SET done = true WHERE id = $1', [todo!.id])
+    expect(await as(bob, 'SELECT done, card_id FROM todos')).toEqual([{ done: true, card_id: ids.card }])
+  })
+
+  it('keeps cards when their story goes, and todos when their card does', async () => {
+    await as(alice, 'DELETE FROM stories WHERE id = $1', [story])
+    expect(await as(alice, 'SELECT story_id FROM cards WHERE id = $1', [ids.card])).toEqual([{ story_id: null }])
+
+    await as(alice, 'DELETE FROM cards WHERE id = $1', [ids.card])
+    expect(await as(bob, 'SELECT text, card_id FROM todos')).toEqual([{ text: 'TM-1', card_id: null }])
+  })
+
+  it('deletes a shared board with its stories and assigned cards', async () => {
+    const board = '10000000-0000-4000-8000-000000000003'
+    const column = '20000000-0000-4000-8000-000000000003'
+    await as(alice, `INSERT INTO boards (id, name, key, position) VALUES ($1, 'Gone', 'GN', 2)`, [board])
+    await as(alice, `INSERT INTO columns (id, board_id, name, position) VALUES ($1, $2, 'To do', 1)`, [column, board])
+    await as(alice, `SELECT invite_board_member($1, 'bob@example.com')`, [board])
+    await as(alice, `INSERT INTO stories (board_id, title, position) VALUES ($1, 'Story', 1)`, [board])
+    await addCard(alice, crypto.randomUUID(), column, board)
+    await as(alice, 'UPDATE cards SET assignee_id = $1 WHERE board_id = $2', [bob, board])
+
+    await as(alice, 'DELETE FROM boards WHERE id = $1', [board])
+    expect(await as(alice, 'SELECT id FROM stories WHERE board_id = $1', [board])).toEqual([])
+    expect(await as(bob, 'SELECT id FROM cards WHERE board_id = $1', [board])).toEqual([])
+  })
+})
+
+describe('rows stay on their board', () => {
+  const board = '10000000-0000-4000-8000-000000000004'
+  const column = '20000000-0000-4000-8000-000000000004'
+  const story = '40000000-0000-4000-8000-000000000004'
+  const card = '30000000-0000-4000-8000-000000000004'
+
+  beforeAll(async () => {
+    await as(alice, `INSERT INTO boards (id, name, key, position) VALUES ($1, 'Kept', 'KP', 3)`, [board])
+    await as(alice, `INSERT INTO columns (id, board_id, name, position) VALUES ($1, $2, 'To do', 1)`, [column, board])
+    await as(alice, `INSERT INTO stories (id, board_id, title, position) VALUES ($1, $2, 'Story', 1)`, [story, board])
+    await as(alice, `SELECT invite_board_member($1, 'bob@example.com')`, [board])
+    await addCard(bob, card, column, board)
+    await as(bob, 'UPDATE cards SET story_id = $1, assignee_id = $2 WHERE id = $3', [story, bob, card])
+  })
+
+  it("won't let a member carry a story or column off to their own board", async () => {
+    await expect(as(bob, 'UPDATE stories SET board_id = $1 WHERE id = $2', [ids.bobBoard, story])).rejects.toThrow(
+      /another board/,
+    )
+    await expect(as(bob, 'UPDATE columns SET board_id = $1 WHERE id = $2', [ids.bobBoard, column])).rejects.toThrow(
+      /another board/,
+    )
+    // So the owner can still take them off the board, which unassigns them.
+    await as(alice, 'DELETE FROM board_members WHERE board_id = $1 AND user_id = $2', [board, bob])
+    expect(await as(alice, 'SELECT assignee_id, story_id FROM cards WHERE id = $1', [card])).toEqual([
+      { assignee_id: null, story_id: story },
+    ])
+  })
+
+  it('deletes the account of a member who made a card and took it', async () => {
+    await as(alice, `SELECT invite_board_member($1, 'bob@example.com')`, [board])
+    await as(bob, 'UPDATE cards SET assignee_id = $1 WHERE id = $2', [bob, card])
+    await db.query('DELETE FROM auth.users WHERE id = $1', [bob])
+    expect(await as(alice, 'SELECT created_by, assignee_id FROM cards WHERE id = $1', [card])).toEqual([
+      { created_by: null, assignee_id: null },
+    ])
+  })
+})

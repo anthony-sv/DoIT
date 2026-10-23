@@ -1,7 +1,8 @@
-import { type Ref, useRef, useState } from 'react'
+import { type Ref, createContext, useContext, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { Link } from '@tanstack/react-router'
 import { useSortable } from '@dnd-kit/react/sortable'
-import { CalendarIcon, GripVerticalIcon, XIcon } from 'lucide-react'
+import { CalendarIcon, GripVerticalIcon, KanbanIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -20,6 +21,14 @@ const rowAction =
 function reportFailure(what: string) {
   return (error: Error) => toast.add({ title: what, description: error.message, type: 'error' })
 }
+
+/** Where the card an imported todo came from lives. */
+export type CardLink = { cardId: string; boardId: string; key: string }
+
+// By card id, filled by the todos page from one live query rather than one
+// per row. A card that is gone, or that you can no longer see, has no entry,
+// so its todo shows no link.
+export const CardLinks = createContext<ReadonlyMap<string, CardLink>>(new Map())
 
 export function SortableTodo({
   index,
@@ -52,12 +61,14 @@ export function TodoRow({
   todo: Todo
 }) {
   const due = todo.due_on ? dueInfo(todo.due_on, todo.done) : null
+  const links = useContext(CardLinks)
+  const link = todo.card_id ? links.get(todo.card_id) : undefined
 
   return (
     <li
       ref={ref}
       className={cn(
-        'group flex min-h-11 items-center gap-3 border-b px-2',
+        'group flex min-h-11 flex-wrap items-center gap-x-3 border-b px-2',
         dragging && 'relative z-10 rounded-lg border-transparent bg-card shadow-lg ring-2 ring-primary',
       )}
     >
@@ -86,9 +97,35 @@ export function TodoRow({
         }
       />
       <TodoText todo={todo} />
-      <div className="flex shrink-0 items-center gap-1">
+      {/* On a phone the link and due chip would leave the text a few
+          characters wide, so they take a line of their own under it
+          (pl-14 lines up with the text), actions on the right. */}
+      <div
+        className={cn(
+          'flex shrink-0 items-center gap-1',
+          (link || due) && 'max-sm:-mt-1.5 max-sm:mb-1.5 max-sm:basis-full max-sm:pl-14',
+        )}
+      >
+        {link ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            nativeButton={false}
+            aria-label={`Open ${link.key} on its board`}
+            className="text-muted-foreground"
+            render={
+              <Link
+                to="/b/$boardId"
+                params={{ boardId: link.boardId }}
+                search={{ card: link.cardId }}
+              />
+            }
+          >
+            <KanbanIcon />
+          </Button>
+        ) : null}
         {due ? <DueChip due={due} /> : null}
-        <TodoDuePicker todo={todo} className={rowAction} />
+        <TodoDuePicker todo={todo} className={cn(rowAction, 'ml-auto')} />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -164,7 +201,7 @@ function TodoText({ todo }: { todo: Todo }) {
   )
 }
 
-function DueChip({ due }: { due: ReturnType<typeof dueInfo> }) {
+export function DueChip({ due }: { due: ReturnType<typeof dueInfo> }) {
   return (
     <span
       className={cn(

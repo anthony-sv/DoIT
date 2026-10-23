@@ -10,13 +10,14 @@ import { toast } from '@/components/ui/toast'
 import { columnsCollection } from '@/data/collections'
 import { moveCard } from '@/data/actions'
 import type { Board, Card, Column, Label } from '@/data/schemas'
+import { useEmails } from '@/hooks/use-board-people'
 import { currentUserId } from '@/lib/auth'
 import { placeAt, positionAfterLast, positionBetween, withItemAt } from '@/lib/position'
 import { cn } from '@/lib/utils'
-import type { ChecklistProgress } from './board-view'
 import { AddCard } from './add-card'
 import { CardTile } from './card-tile'
 import { ColumnMenu } from './column-menu'
+import type { ChecklistProgress } from './view-props'
 
 type Items = Record<string, string[]>
 
@@ -76,6 +77,7 @@ export function BoardColumns({
   const cardsById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards])
   const columnsById = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns])
   const labelsById = useMemo(() => new Map(labels.map((l) => [l.id, l])), [labels])
+  const emails = useEmails()
 
   function dropCard(cardId: string, finalItems: Items) {
     const card = cardsById.get(cardId)
@@ -151,6 +153,7 @@ export function BoardColumns({
                 cardIds={items[column.id] ?? []}
                 cardsById={cardsById}
                 labelsById={labelsById}
+                emails={emails}
                 progress={progress}
                 sprintId={sprintId}
                 onOpenCard={onOpenCard}
@@ -172,6 +175,7 @@ function BoardColumn({
   cardIds,
   cardsById,
   labelsById,
+  emails,
   progress,
   sprintId,
   onOpenCard,
@@ -183,6 +187,7 @@ function BoardColumn({
   cardIds: string[]
   cardsById: Map<string, Card>
   labelsById: Map<string, Label>
+  emails: Map<string, string>
   progress: ChecklistProgress
   sprintId: string | null
   onOpenCard: (id: string) => void
@@ -254,6 +259,9 @@ function BoardColumn({
               column={column}
               boardKey={board.key}
               labels={card.label_ids.map((l) => labelsById.get(l)).filter((l) => l !== undefined)}
+              assignee={
+                card.assignee_id ? (emails.get(card.assignee_id) ?? 'Unknown account') : undefined
+              }
               progress={progress.get(id)}
               onOpen={() => onOpenCard(id)}
             />
@@ -277,6 +285,7 @@ function SortableCard({
   column,
   boardKey,
   labels,
+  assignee,
   progress,
   onOpen,
 }: {
@@ -285,6 +294,7 @@ function SortableCard({
   column: Column
   boardKey: string
   labels: Label[]
+  assignee: string | undefined
   progress: { done: number; total: number } | undefined
   onOpen: () => void
 }) {
@@ -302,6 +312,7 @@ function SortableCard({
       done={column.is_done}
       boardKey={boardKey}
       labels={labels}
+      assignee={assignee}
       progress={progress}
       dragging={isDragging}
       onOpen={onOpen}

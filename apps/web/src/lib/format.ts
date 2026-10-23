@@ -33,6 +33,13 @@ export const priorityNames: Record<Priority, string> = {
   urgent: 'Urgent',
 }
 
+/** An estimate in days: "0.5 d" on a card, "1 day" or "10.5 days" in a total. */
+export function daysLabel(days: number, style: 'short' | 'long' = 'short') {
+  const n = Number(days.toFixed(2))
+  if (style === 'short') return `${n} d`
+  return n === 1 ? '1 day' : `${n} days`
+}
+
 /** Whole days from now until the end of `endsOn` (negative once it is past). */
 export function daysUntil(endsOn: string, now = new Date()) {
   return Math.ceil((new Date(`${endsOn}T23:59:59`).getTime() - now.getTime()) / 86_400_000)

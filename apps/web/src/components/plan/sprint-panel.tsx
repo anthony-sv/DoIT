@@ -15,7 +15,7 @@ import { toast } from '@/components/ui/toast'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { startSprint } from '@/data/actions'
 import type { Sprint } from '@/data/schemas'
-import { sprintRange } from '@/lib/format'
+import { daysLabel, sprintRange } from '@/lib/format'
 import { cardsLabel } from './planning'
 import { SprintDetails } from './sprint-details'
 import { SprintMenu } from './sprint-menu'
@@ -25,6 +25,7 @@ export function SprintPanel({
   sprint,
   running,
   cardCount,
+  estimate,
   editing,
   onEditingChange,
   children,
@@ -33,6 +34,8 @@ export function SprintPanel({
   /** The board's active sprint, if there is one. */
   running: Sprint | undefined
   cardCount: number
+  /** Days estimated across its cards. */
+  estimate: number
   editing: boolean
   onEditingChange: (editing: boolean) => void
   children: ReactNode
@@ -51,6 +54,7 @@ export function SprintPanel({
         </CardTitle>
         <CardDescription>
           {sprintRange(sprint.starts_on, sprint.ends_on)} · {cardsLabel(cardCount)}
+          {estimate > 0 ? ` · ${daysLabel(estimate, 'long')}` : null}
         </CardDescription>
         {sprint.goal ? <CardDescription>{sprint.goal}</CardDescription> : null}
         <CardAction className="flex items-center gap-1">
